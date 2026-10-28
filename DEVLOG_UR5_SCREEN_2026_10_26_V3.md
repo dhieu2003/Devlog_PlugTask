@@ -28,6 +28,8 @@ File: `data/scripts/ur5_screen_V3.py` (+ `_geom_V3`, `_curobo_V3`, `_render_isaa
 | 2 | −0,2 mm (chạm) | 0 |
 | 3 | 68,1 mm | 0 |
 
+[https://github.com/user-attachments/assets/3bd77422-2d84-4741-8d16-f87c252aaa50](https://github.com/user-attachments/assets/3bd77422-2d84-4741-8d16-f87c252aaa50)
+
 ## 4. Hạn chế còn lại
 Như V2: sai số chân > 0,07 mm; dây tác động một chiều lên phích; chưa có đo lực căng dây; dây 1,2 m. Tiếp xúc dây–cột 1e5 N/m vẫn cho phép xuyên ~0,2 mm khi căng mạnh (không nhìn thấy).
 
