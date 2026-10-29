@@ -68,6 +68,8 @@ After `plans/guide/spec` were corrected, it became clear that **V0 misread the e
 | Gripper | 70° tilt | 40° tilt (reaches the far wall; wrist clears post tops) |
 | Video | Fixed camera | Far camera, plug trajectory trail (cyan) |
 
+[https://github.com/user-attachments/assets/3b1ee783-b93b-437f-ab62-e1722558780b](https://github.com/user-attachments/assets/3b1ee783-b93b-437f-ab62-e1722558780b)
+
 ### Symptom → hypothesis → change → result
 | # | Symptom | Hypothesis | Change | Result |
 |---|---|---|---|---|
