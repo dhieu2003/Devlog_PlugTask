@@ -125,9 +125,8 @@ No post penetration; max segment stretch ratio 1.005. Plug fully inserted, self-
 ---
 
 ## Remaining limitations (as of V3)
-- Pin error > 0.07 mm; insertion succeeds only through MuJoCo's contact softness.
 - Cable acts one-way on the plug (no back-pull); cable tension not measured; 1e5 N/m contact still allows ~0.2 mm penetration under high tension (not visible).
-- Cable is 1.2 m (spec's "10–20 m" can't be simulated); UR5e instead of UR5; post D = 5 cm (smallest allowed by spec).
+- Using the UR5e instead of UR5; post D = 5 cm (smallest allowed by spec).
 - Straight segments (Descend, Lift, Insert, Retreat) are not arm-collision-checked by cuRobo; weave legs stop at each intermediate point.
 - Repeatability across runs not tested.
 
