@@ -131,17 +131,5 @@ No post penetration; max segment stretch ratio 1.005. Plug fully inserted, self-
 - Repeatability across runs not tested.
 
 ## Future work
-1. Force/vision servoing during insertion (find the hole by force) to get < 0.07 mm; stiff contact + feedback alignment.
-2. 1.5 mm × 45° lead-in chamfer at slot/hole mouths (per spec) to tolerate ±5° misalignment.
-3. Feedback-controlled grip force (15–30 N) to avoid the 12 mm slip on the first lift.
-4. cuRobo checks on straight segments; two-way cable–plug coupling; measure cable–post distance and cable tension; continuous trajectory without stops between waypoints.
-
-## How to re-run
-```
-cd data/scripts
-python ur5_screen.py --test            # V0 (video: ur5_screen_render_isaac.py)
-python ur5_screen_V2.py --test         # V2
-python ur5_screen_V3.py --test         # V3
-python ur5_screen_render_isaac_V3.py   # data/results/video_ur5_screen_V3.mp4
-```
-Options: `--no-cable`, `--grip-effort`, `--v-carry`, `--replan`, `--cable-contact-ke`, `--cable-contact-kd` (V3).
+1. Feedback-controlled grip force (15–30 N) to avoid the 12 mm slip on the first lift.
+2. cuRobo checks on straight segments; two-way cable–plug coupling; measure cable–post distance and cable tension; continuous trajectory without stops between waypoints.
