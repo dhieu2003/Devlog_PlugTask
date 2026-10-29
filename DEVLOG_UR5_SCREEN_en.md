@@ -1,7 +1,5 @@
 # DEVLOG UR5_SCREEN (V0 → V3) – UR5e + Robotiq 2F-85 inserting a NEMA 5-15P plug through 3 posts
 
-Consolidated from `DEVLOG_UR5_SCREEN_2026_10_26.md` (V0), `_V2.md` and `_V3.md`. Each version follows the chain **symptom → hypothesis → change → result**. V1 was only an intermediate step the same day (no separate devlog; the `_V1` files are left untouched).
-
 **Task** (`plans/UR5_Screen.md`): a UR5 with a Robotiq 2F-85 grasps the plug at the end of a VBD cable lying on the floor, lifts it, carries it past a row of 3 obstacle posts, plugs it into a wall socket (perpendicular to the floor), releases, and returns Home. The Isaac Sim video shows an OXYZ gizmo (bottom-left) and a gravity vector P at the middle of the arm.
 
 **Stack**: Newton + `SolverMuJoCo` (robot, plug, contacts; 16 substeps per 60 Hz frame), `SolverVBD` for the cable (one-way: the cable does not act back on the plug), cuRobo 0.8 for collision-free planning, headless Isaac Sim for video.
