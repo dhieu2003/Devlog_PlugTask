@@ -30,7 +30,7 @@ The pin-position requirement of < 0.07 mm is **not met** in any version.
 | In-hand perception | Measure plug pose relative to TCP, then recompute a straight insertion path |
 
 Self-made assumptions (pending confirmation): cable 0.9 m (spec's "10–20 m" is too large for the scene); plug passes through the gap between posts 2–3; plug stands on its narrow edge, grasped with a 70° tilt; Pose A = (0.30, 0) m, socket at (0.78, 0.09, 0.28) m. Right-handed frame used (spec says Y points "from inside to outside", which conflicts with X right, Z up) – needs confirmation.
-[https://github.com/dhieu2003/Devlog_PlugTask/issues/2#issue-6097664631](https://github.com/dhieu2003/Devlog_PlugTask/issues/2#issue-6097664631)]
+[https://github.com/user-attachments/assets/c51a4447-8b6c-4cca-af25-cd4a028b1614](https://github.com/user-attachments/assets/c51a4447-8b6c-4cca-af25-cd4a028b1614)
 
 ### Symptom → hypothesis → change → result
 
