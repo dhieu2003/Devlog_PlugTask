@@ -79,6 +79,8 @@ After `plans/guide/spec` were corrected, it became clear that **V0 misread the e
 | 4 | IK has no solution at gap 2–3 with +90° rotation | Outside reach (front branch) | Use 60° rotation at gap 2–3 | Solution found |
 | 5 | IK goal lands on another branch / exceeds joint limits | Local IK | `ik_near`: multiple seeds, choose the solution closest to the previous configuration within joint limits; plan with `plan_cspace` | Continuous solutions |
 
+[https://github.com/user-attachments/assets/c51a4447-8b6c-4cca-af25-cd4a028b1614](https://github.com/user-attachments/assets/c51a4447-8b6c-4cca-af25-cd4a028b1614)
+
 ### V2 result (`python ur5_screen_V2.py --test`, 41.5 s sim, 586 s wall-clock)
 - Full sequence Home → Approach → Grasp → Lift → weave posts 1-2-3 → Plug → Release → Return runs; plug fully inserted, self-holding, housing face 0.45 mm from the socket. Grip ≈ 27 N/pad, TCP ≤ 0.25 m/s.
 - **Not met**: pin error 0.19/0.12 mm, ~1° tilt.
@@ -93,6 +95,8 @@ Measured on the V2 trajectory: the cable penetrates post 2 by up to **17.8 mm** 
 
 ### Hypothesis
 Cable–post collision in Newton/VBD is penalty contact with `ke = 1e3` N/m. In V2, to stop the cable "snapping", the stretch stiffness was raised from 10 to 1e6 ⇒ the cable barely stretches; when the plug tensions the cable around post 2, the tension far exceeds the maximum push-back of the soft contact ⇒ the cable is forced through. The two parameters are mismatched: **stiff cable, soft contact**.
+
+[https://github.com/user-attachments/assets/3bd77422-2d84-4741-8d16-f87c252aaa50](https://github.com/user-attachments/assets/3bd77422-2d84-4741-8d16-f87c252aaa50)
 
 ### Verification
 Replay the exact V2 plug trajectory through the cable model only (temporary script, outside the project) with different `ke`:
