@@ -57,6 +57,8 @@ The V0, V1 and V2 scripts were deleted on request (no longer in `data/scripts/`)
 - **Explanation:** I checked the rotation angle of the middle segment: the cable **rolls on the ground like a tube**. VBD has no rolling friction, so the rolling does not decay; at release, pad friction drags the cable surface and gives it an initial spin. Reducing the twist stiffness does not solve it.
 - **Change:** enabled `contact_matching="sticky"` for the collision pipeline and `rigid_contact_history=True` in VBD (persistent friction anchors), applied to both the main and proxy pipelines → static friction holds the cable stably. The collision pipeline must be created before the VBD solver so that the contact history gets allocated. Added a `clear` step (open fully, then lift), and a slower release and slower retract lift so the pads do not drag the cable.
 
+[https://github.com/user-attachments/assets/bab98aec-7f43-4fad-b1bc-1ee17260c15a](https://github.com/user-attachments/assets/bab98aec-7f43-4fad-b1bc-1ee17260c15a)
+
 ### 2.5 Cable too stiff (your feedback) – V1
 - **Symptom:** the cable lacks flexibility in the video; you allowed relaxing the error threshold to 8 mm.
 - **V1 change:** bend stiffness 5e-3 → 2e-3, threshold 8 mm.
