@@ -1,4 +1,4 @@
-# DEVLOG UR5_SCREEN (V0 → V3) – UR5e + Robotiq 2F-85 inserting a NEMA 5-15P plug through 3 posts
+# DEVLOG UR5_SCREEN (V1 → V3) – UR5e + Robotiq 2F-85 inserting a NEMA 5-15P plug through 3 posts
 
 **Task** (`plans/UR5_Screen.md`): a UR5 with a Robotiq 2F-85 grasps the plug at the end of a VBD cable lying on the floor, lifts it, carries it past a row of 3 obstacle posts, plugs it into a wall socket (perpendicular to the floor), releases, and returns Home. The Isaac Sim video shows an OXYZ gizmo (bottom-left) and a gravity vector P at the middle of the arm.
 
@@ -8,7 +8,7 @@
 
 | Version | Main setup | Plug inserted & self-holding | Pin error / tilt | Cable |
 |---|---|---|---|---|
-| V0 | 3 posts r=2 cm, H=40 cm side by side, passes through gap between posts 2–3 | Yes, housing face 0.49 mm from socket | 0.19 / 0.11 mm, ~1.0° | Follows plug, no wrapping (video only) |
+| V1 | 3 posts r=2 cm, H=40 cm side by side, passes through gap between posts 2–3 | Yes, housing face 0.49 mm from socket | 0.19 / 0.11 mm, ~1.0° | Follows plug, no wrapping (video only) |
 | V2 | 3 posts D=5 cm, H=30 cm in line robot–wall, staggered weave | Yes, 0.45 mm | 0.19 / 0.12 mm, ~1° | Continuous, but penetrates post 2 by up to 17.8 mm |
 | V3 | Same as V2, cable contact stiffness changed | Yes, 0.45 mm | 0.19 / 0.12 mm, ~1° | No post penetration, max stretch ratio 1.005 |
 
@@ -16,7 +16,7 @@ The pin-position requirement of < 0.07 mm is **not met** in any version.
 
 ---
 
-## V0 – `ur5_screen.py`: baseline pick-and-insert pipeline
+## V1 – `ur5_screen.py`: baseline pick-and-insert pipeline
 
 ### Design
 | Component | Approach |
@@ -43,21 +43,21 @@ Self-made assumptions (pending confirmation): cable 0.9 m (spec's "10–20 m" is
 | 6 | Wall rendered in the wrong place in the video | USD applied scale before transform, multiplying coordinates | Apply transform first, then scale | Wall correct |
 | 7 | Changing shape `ke` had no effect | MuJoCo contact stiffness comes from `solref/solimp`, not `ke` | Tried `solref`=0.004 and tight `solimp` | **Plug jams** (3.4° tilt, 21 mm short): in-hand perception is only ~0.5° accurate (≈0.2 mm at the pin tip), larger than the 0.07 mm clearance. Disabled by default (`SCREEN_STIFF=1` to enable) |
 
-### V0 result (`python ur5_screen.py --test`)
+### V1 result (`python ur5_screen.py --test`)
 - Full sequence Home → Approach → Grasp → Lift → Transport (gap between posts 2–3) → Plug → Release → Retreat → Return runs; plug fully inserted, self-holding after release, housing face **0.49 mm** from the socket (design 0.5 mm).
 - Grip force 26–28 N per pad (recommended 12–30 N); TCP speed while carrying ≤ 0.25 m/s, acceleration ≤ 0.8 m/s².
 - **Not met**: pin axis offset 0.19 mm at the socket face, 0.11 mm at the blade tip, ~1.0° tilt (requirement < 0.07 mm). Insertion succeeds thanks to MuJoCo's default contact softness (~0.1 mm penetration).
 - Limitations: insertion force only indirect (~7 N), no grip-force control; cuRobo uses bounding boxes for posts; one-way cable; "no wrapping" checked by video only; repeatability not tested.
 
 ### Issue leading to V2
-After `plans/guide/spec` were corrected, it became clear that **V0 misread the environment**: the 3 posts must be in line along the X axis (robot → posts → wall), and the cable must be threaded around the posts, not just pass through one gap.
+After `plans/guide/spec` were corrected, it became clear that **V1 misread the environment**: the 3 posts must be in line along the X axis (robot → posts → wall), and the cable must be threaded around the posts, not just pass through one gap.
 
 ---
 
 ## V2 – `ur5_screen_V2.py`: redo per the corrected description (staggered weave through 3 posts)
 
-### Changes vs V0
-| Item | V0 | V2 |
+### Changes vs V1
+| Item | V1 | V2 |
 |---|---|---|
 | Posts | 3 posts r=2 cm, H=40 cm, side by side | 3 posts D=5 cm, H=30 cm, in line robot–wall, post 1 at 0.50 m from robot base, 0.20 m apart |
 | Trajectory | Through gap between posts 2–3 | Staggered: post 1 (+Y) → gap → post 2 (−Y) → gap → post 3 (+Y) → socket; each leg planned by cuRobo (joint-space, continuous IK); wrist rotates about Z by 90° at gap 1–2 and 60° at gap 2–3 |
@@ -132,7 +132,7 @@ No post penetration; max segment stretch ratio 1.005. Plug fully inserted, self-
 ## How to re-run
 ```
 cd data/scripts
-python ur5_screen.py --test            # V0 (video: ur5_screen_render_isaac.py)
+python ur5_screen.py --test            # V1 (video: ur5_screen_render_isaac.py)
 python ur5_screen_V2.py --test         # V2
 python ur5_screen_V3.py --test         # V3
 python ur5_screen_render_isaac_V3.py   # data/results/video_ur5_screen_V3.mp4
