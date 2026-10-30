@@ -94,28 +94,16 @@ The V0, V1 and V2 scripts were deleted on request (no longer in `data/scripts/`)
 - `num_frames` now defaults to being computed from the total keyframe time; the trajectory is always saved (no `--test` needed) – fixing a limitation of the Franka version.
 - Parameters tunable without editing code: `--grip-close`, `--pad-mu`, `--ground-mu`, `--ground-kd`, `--bend-stiffness`, `--twist-stiffness`, `--stretch-stiffness`, `--damping-ratio`, `--release-time`, `--sticky`.
 
----
 
-## 3. How to rerun V3
-```
-cd data/scripts
-python UR5_2F85_V3.py --viewer null --device cuda --test
-cd ../..
-python data/scripts/UR5_2F85_render_isaac.py --traj data/results/ur5_2F85_V3_traj.npz --shapes data/results/ur5_2F85_V3_shapes.pkl --out data/results/video_ur5_2F85_V3.mp4 --stride 2
-```
-Video: `data/results/video_ur5_2F85_V3.mp4`.
-
-## 4. Remaining limitations
+## 3. Remaining limitations
 - Placement error still varies by a few mm between runs (VBD cable–ground friction has no rolling friction; the sticky anchors still jitter slightly); it is not guaranteed to always be < 5 mm.
 - Grip force is only limited indirectly (2 Nm torque, 6 mm gap); the actual force at the pads has not been measured (15–30 N recommended).
 - The cable has a bend stiffness of 5e-3, stiffer than the Franka version; this was chosen to avoid the U-shaped fold.
-- Detect only reads the cable position from the simulation; the simulated RealSense D435 camera is not yet used.
 - The robot is a UR5e instead of a UR5.
 - Default Pose A/B are inherited from the Franka version.
 
-## 5. Future work
+## 4. Future work
 1. Reduce drift after release: dedicated rolling friction/damping for the cable, more symmetric pad opening.
 2. Measure the pad contact force and calibrate it within 15–30 N.
-3. Simulate the D435 camera for the Detect step.
-4. Try other Pose A/B and other cable lengths/diameters (10–50 cm, 5–15 mm).
-5. Grip at two points or near one end of the cable to reduce sagging.
+3. Try other Pose A/B and other cable lengths/diameters (10–50 cm, 5–15 mm).
+4. Grip at two points or near one end of the cable to reduce sagging.
