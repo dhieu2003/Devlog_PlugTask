@@ -65,15 +65,21 @@ The V0, V1 and V2 scripts were deleted on request (no longer in `data/scripts/`)
 - **Result:** errors of 2.2 / 3.3 / 10.2 mm; but after placement the cable bowed sideways by 10–15 cm (lateral deviation 0.019–0.146 m).
 - **Explanation:** the softer cable resists the pads' lateral pull during opening less, and bends along with that offset, so it both drifts and bows; the error of the middle segment does not reflect that the whole cable is bent.
 
+[https://github.com/user-attachments/assets/ee0ed14b-4ec9-4dc7-a6ee-925c5bc15838 ](https://github.com/user-attachments/assets/ee0ed14b-4ec9-4dc7-a6ee-925c5bc15838 )
+
 ### 2.6 Slow release and damping – V2
 - **V2 change:** release time 3 → 6 s (`--release-time`); added `--damping-ratio` (bend damping / bend stiffness ratio, default 2e-3).
 - **Result:** 6 s release: 1.7 / 2.9 / 22.3 / 8.3 / 8.4 mm (2/5 passed at 8 mm). Damping 0.05: 33.1 / 10.5 mm; combined: 3.5 / 43.5 mm.
 - **Explanation:** a slow release reduces the impulse transferred to the cable as the pads leave (beneficial). High damping instead makes the cable "stick" and get dragged more when the pads leave, so it does not help; the 2e-3 soft cable still bends easily.
 
+[https://github.com/user-attachments/assets/53598de1-cfd8-43b4-9976-527ea7f1d55e ](https://github.com/user-attachments/assets/53598de1-cfd8-43b4-9976-527ea7f1d55e )
+
 ### 2.7 Reducing stretch stiffness – V3 (the accepted version)
 - **Request:** relax the error threshold to 10 mm, go back to the old stiffness (bend 5e-3), and reduce the "elastic modulus" (which I interpreted as the stretch stiffness).
 - **V3 change:** `--stretch-stiffness` (default 1e2 → 10), bend back to 5e-3, 6 s release kept, retract lift 1.5 → 2.5 s, threshold 10 mm.
 - **Result (3 runs per level):**
+
+[https://github.com/user-attachments/assets/9dcbf8e8-de1f-4bc5-b35a-6360376b8efc ](https://github.com/user-attachments/assets/9dcbf8e8-de1f-4bc5-b35a-6360376b8efc )
 
 | Stretch stiffness | Placement error (mm) | Cable after placement |
 |---|---|---|
