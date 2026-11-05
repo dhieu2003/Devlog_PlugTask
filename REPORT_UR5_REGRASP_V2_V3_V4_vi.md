@@ -53,10 +53,17 @@ Số liệu V2 ở hàng "phích dịch" lấy từ các lần chạy của bả
 1. Sinh nhiều nghiệm IK rồi sắp theo độ dịch khớp lớn nhất so với tư thế hiện tại $q_{ref}$:
 
 $$
-J(q) = \max_{i=1..6} \left| q_i - q_{ref,i} \right|
+D(q) = \max_{i=1..6} \left| q_i - q_{ref,i} \right|
 $$
 
-Nghiệm có $J$ nhỏ nhất đứng đầu là nhánh "không quay vòng". cuRobo chỉ lập kế hoạch tới các nghiệm đầu danh sách, và bỏ qua nghiệm nào có $J > 200$ độ.
+Trong đó:
+- $q = (q_1,\dots,q_6)$ là một nghiệm IK ứng viên: 6 góc khớp của UR5 [rad], thứ tự từ đế (vai xoay) tới cổ tay 3.
+- $q_{ref}$ là tư thế khớp hiện tại của robot (điểm xuất phát của chuyển động), cũng 6 góc [rad].
+- $q_i - q_{ref,i}$ là độ lệch của khớp thứ $i$ giữa nghiệm ứng viên và tư thế hiện tại.
+- $\max_i |\cdot|$ lấy khớp lệch nhiều nhất. Dùng giá trị lớn nhất (không dùng tổng) vì ta muốn không khớp nào phải quay một quãng lớn, đặc biệt là không khớp nào lệch cả vòng $2\pi$.
+- $D(q)$ [rad] là "quãng quay lớn nhất của một khớp" để đi từ $q_{ref}$ tới $q$. Nghiệm có $D$ nhỏ nhất đứng đầu danh sách.
+
+Nghiệm có $D$ nhỏ nhất là nhánh "không quay vòng". cuRobo chỉ lập kế hoạch tới các nghiệm đầu danh sách (tối đa 10), và dừng khi gặp nghiệm có $D > 200$ độ (các nghiệm sau còn xa hơn vì danh sách đã sắp xếp).
 
 2. Mỗi nghiệm IK được tìm bằng bình phương tối thiểu có giảm chấn (DLS), khởi động từ nhiều điểm gần $q_{ref}$:
 
@@ -64,17 +71,39 @@ $$
 \Delta q = J_a^{\top}\left(J_a J_a^{\top} + \lambda^2 I\right)^{-1} e,\qquad \lambda^2 = 10^{-3}
 $$
 
-   Ở đây $J_a$ là Jacobian 6x6 tính bằng sai phân hữu hạn, $e = [\,p_{tgt}-p\;;\; e_R\,]$ là sai số 6 chiều, và sai số hướng lấy từ phần phản đối xứng:
+   Trong đó:
+   - $\Delta q$ (6 phần tử, [rad]) là bước chỉnh góc khớp trong một vòng lặp; sau đó $q \leftarrow q + \Delta q$ rồi tính lại.
+   - $J_a$ là Jacobian 6x6 tại $q$ hiện tại. Cột $j$ cho biết TCP dịch và xoay thế nào khi khớp $j$ quay thêm 1 rad (3 hàng đầu là vị trí [m/rad], 3 hàng sau là hướng). Code tính nó bằng sai phân hữu hạn: lệch riêng từng khớp một lượng $10^{-6}$ rad rồi gọi lại động học thuận.
+   - $J_a^{\top}$ là ma trận chuyển vị của $J_a$; $I$ là ma trận đơn vị 6x6.
+   - $\lambda^2 = 10^{-3}$ là hệ số giảm chấn (`damping`). Nó giữ cho ma trận $J_a J_a^{\top} + \lambda^2 I$ khả nghịch và không để bước $\Delta q$ quá lớn khi cánh tay gần điểm kỳ dị (Jacobian suy biến).
+   - $e$ là sai số 6 chiều: $e = [\,p_{tgt}-p \;;\; e_R\,]$, trong đó $p_{tgt}$ là vị trí TCP đích [m], $p$ là vị trí TCP hiện tại [m] (tính bằng động học thuận từ $q$), nên $p_{tgt}-p$ là vector từ vị trí hiện tại tới vị trí đích; $e_R$ là sai số hướng (công thức dưới).
+   - Vòng lặp dừng khi $\|p_{tgt}-p\| < 2\cdot 10^{-6}$ m và $\|e_R\| < 10^{-5}$ rad, hoặc hết số vòng tối đa.
+
+   Sai số hướng $e_R$ lấy từ phần phản đối xứng của ma trận quay còn thiếu:
 
 $$
 e_R = \tfrac12\,\mathrm{vee}\!\left(R_{t}R_{c}^{\top} - \left(R_{t}R_{c}^{\top}\right)^{\top}\right)
 $$
+
+   Trong đó:
+   - $R_t$ là ma trận quay 3x3 đích (hướng mong muốn của tay), $R_c$ là ma trận quay hiện tại; $R_c^{\top}$ là chuyển vị của $R_c$, cũng là nghịch đảo của nó.
+   - $R_t R_c^{\top}$ là phép quay phải thêm vào để đi từ hướng hiện tại tới hướng đích. Nếu hai hướng trùng nhau thì nó bằng ma trận đơn vị.
+   - $M - M^{\top}$ (với $M = R_t R_c^{\top}$) là phần phản đối xứng, chỉ còn mang thông tin về trục và góc quay.
+   - $\mathrm{vee}(\cdot)$ đọc ma trận phản đối xứng $\begin{bmatrix}0&-c&b\\ c&0&-a\\ -b&a&0\end{bmatrix}$ thành vector $(a,b,c)$. Trong code: $e_R = \tfrac12\,(M_{32}-M_{23},\; M_{13}-M_{31},\; M_{21}-M_{12})$.
+   - Kết quả là $\sin\theta\cdot \hat{n}$, với $\theta$ là góc còn thiếu và $\hat{n}$ là trục quay đơn vị. Với góc nhỏ thì $\approx \theta\,\hat{n}$ [rad], và bằng 0 khi hướng đã đúng.
 
 3. Khi về Home, đưa đích về dạng tương đương modulo $2\pi$ gần tư thế hiện tại nhất, để cổ tay không phải tháo xoắn:
 
 $$
 q_j' = \arg\min_{k\in\{-1,0,1\}} \left| q_j + 2\pi k - q_{cur,j} \right|,\qquad \left|q_j'\right| < 2\pi - 0.1
 $$
+
+Trong đó:
+- $q_j$ là góc đích của khớp $j$ [rad] (có thể là $q_j$ hoặc lệch cả vòng so với tư thế hiện tại).
+- $q_{cur,j}$ là góc hiện tại của khớp $j$ [rad].
+- $k \in \{-1, 0, 1\}$ là số vòng đầy ($2\pi$) cộng hay trừ thêm. Góc $q_j + 2\pi k$ cho cùng một tư thế vật lý của khớp, chỉ khác số vòng quay.
+- $\arg\min$ chọn $k$ sao cho $q_j + 2\pi k$ gần $q_{cur,j}$ nhất, tức khớp quay đường ngắn nhất.
+- Điều kiện $|q_j'| < 2\pi - 0.1$ giữ góc chọn trong giới hạn khớp $\pm 2\pi$ của UR5 (trừ biên 0,1 rad). Giá trị $q_j'$ chọn được là góc đích cuối cùng của khớp $j$.
 
 Code (`ur5_regrasp_curobo_V4full.py`):
 
@@ -93,7 +122,7 @@ def ik_candidates(p, r, q_ref, tries=120, seed=1):
         rng2 = np.random.default_rng(seed + 1)
         for _ in range(2*tries):
             add(rng2.uniform(-np.pi, np.pi, 6))
-    sols.sort(key=lambda q: float(np.max(np.abs(q - q_ref))))   # J(q) nhỏ nhất đứng đầu
+    sols.sort(key=lambda q: float(np.max(np.abs(q - q_ref))))   # D(q) nhỏ nhất đứng đầu
     return sols
 
 def unwrap_goal(q_goal, q_cur):
@@ -126,7 +155,14 @@ $$
 F_{t} \le 2\,\mu\,F_n
 $$
 
-với $F_n$ là lực pháp tuyến mỗi má (do lực kẹp quyết định) và $\mu$ là ma sát giữa má và dây (ở đây là ma sát của thân proxy). Hai thay đổi nâng cả hai vế $\mu$ và $F_n$ cùng lúc.
+Trong đó:
+- $F_t$ [N] là lực dọc theo dây (tiếp tuyến với mặt má) mà dây tác dụng lên chỗ kẹp, tức lực kéo muốn làm dây trượt ra khỏi má khi tay đi qua khe.
+- $F_n$ [N] là lực ép vuông góc của mỗi má lên dây. Nó do mô-men giới hạn của động cơ kẹp (`--cable-grip-effort`) quyết định: mô-men càng lớn thì ép càng mạnh.
+- $\mu$ (không thứ nguyên) là hệ số ma sát giữa má và đoạn dây bị kẹp (code đặt trên thân proxy của dây: 0,7 ở V2, 1,2 ở V3 và V4).
+- Hệ số $2$ vì có hai má kẹp, mỗi má cho lực ma sát tối đa $\mu F_n$.
+- Vế phải $2\mu F_n$ [N] là lực ma sát lớn nhất giữ dây không trượt. Nếu $F_t$ vượt giá trị này, dây trượt (tuột).
+
+Hai thay đổi (lực kẹp và ma sát) nâng cả hai thừa số $F_n$ và $\mu$ của vế phải cùng lúc.
 
 **Giải pháp.**
 
@@ -165,12 +201,31 @@ $$
 R_{tool}(\psi,\theta) = R_z(\psi)\,R_y(\theta)\,R_0 ,\qquad \theta = 40^\circ\ (\text{tilt})
 $$
 
+Trong đó:
+- $R_{tool}$ là ma trận quay 3x3 từ hệ cổ tay 3 (wrist_3) sang hệ thế giới; nó cho biết bàn tay đang hướng thế nào.
+- $\psi$ (yaw) là góc xoay cả bàn tay quanh trục Z thẳng đứng của thế giới [rad]. $\psi = 0$ là tay hướng thẳng về phía +X.
+- $\theta$ (tilt) là góc chúc xuống của trục công cụ so với phương +X, bằng $40^\circ$ (hằng số `GRASP_TILT`).
+- $R_z(\psi)$ và $R_y(\theta)$ là ma trận quay cơ bản quanh trục Z và trục Y.
+- $R_0 = \begin{bmatrix}0&1&0\\-1&0&0\\0&0&1\end{bmatrix}$ là hướng gốc của wrist_3 (các cột là trục x, y, z của wrist trong thế giới) khi chưa có yaw và tilt.
+
+Như vậy $\psi$ là đại lượng bị đổi: V2 và V3 dùng $\psi=-90^\circ$ ở khe 1-2 và $+60^\circ$ ở khe 2-3, còn V4 dùng $\psi = 0$.
+
 Lúc cắm, phích do tay giữ và dây còn chùng, nên xoay yaw không sao. Lúc re-grasp thì khác: phích đã cố định trong ổ, tay kẹp dây ở cung 0,78 m trên tổng 1,6 m. Xoay yaw làm cổ tay 6 quay khoảng 106 độ ở chặng vào khe 2-3, vặn và kéo dây, và lực đó truyền về phích. Dây có độ cứng (E = 5·10⁶ Pa, bán kính 5 mm, 64 đoạn dài $\ell = 25$ mm):
 
 $$
 k_{stretch} = \frac{EA}{\ell} \approx 1.57\cdot 10^{4}\ \mathrm{N/m},\qquad
 k_{bend} = \frac{EI}{\ell} = \frac{E\,\pi r^4/4}{\ell} \approx 0.098\ \mathrm{N\,m/rad}\ (\text{mỗi khớp})
 $$
+
+Trong đó:
+- $E = 5\cdot 10^{6}$ Pa là mô-đun Young của dây (độ cứng vật liệu).
+- $r = 5$ mm là bán kính dây; $A = \pi r^2 \approx 7{,}85\cdot 10^{-5}$ m² là diện tích tiết diện, nên $EA \approx 393$ N.
+- $I = \pi r^4/4 \approx 4{,}91\cdot 10^{-10}$ m⁴ là mô-men quán tính diện tích của tiết diện tròn, nên $EI \approx 2{,}45\cdot 10^{-3}$ N·m² (độ cứng uốn).
+- $\ell = 1{,}6/64 = 25$ mm là chiều dài mỗi đoạn dây (dây 1,6 m chia 64 đoạn).
+- $k_{stretch}$ [N/m] là độ cứng kéo giãn của một đoạn: kéo giãn thêm 1 m thì sinh lực 15 700 N (tính tuyến tính).
+- $k_{bend}$ [N·m/rad] là độ cứng uốn của một khớp nối giữa hai đoạn: uốn thêm 1 rad thì sinh mô-men 0,098 N·m.
+
+Hai số này khớp với giá trị mà bộ mô phỏng VBD dùng (ghi trong log), nên dây khá mềm khi uốn và rất cứng khi kéo giãn. Đây là các hằng số vật liệu để người đọc hình dung độ cứng của dây, không phải một phép tính chứng minh trực tiếp độ dịch của phích.
 
 Bằng chứng nhân quả khá chắc: giữa V3 và V4 chỉ đổi yaw cổ tay (và tiêu chí test), nên mức phích dịch giảm là do bỏ yaw. Cơ chế cụ thể (vặn và kéo dây) là giải thích theo log, chưa được tách riêng bằng thí nghiệm khác.
 
@@ -191,6 +246,13 @@ Các lượt băng khe vẫn là đoạn thẳng Descartes ở cùng độ cao v
 $$
 p(s) = p_0 + s\,(p_1 - p_0),\qquad R(s) = \mathrm{Slerp}(R_0, R_1; s),\qquad s\in[0,1]
 $$
+
+Trong đó:
+- $s$ là tham số nội suy không thứ nguyên, đi từ 0 (điểm đầu) đến 1 (điểm cuối); đây không phải chiều dài cung của dây.
+- $p_0$ và $p_1$ là vị trí TCP điểm đầu và điểm cuối của lượt băng khe [m]; $p(s)$ là vị trí TCP tại $s$, một điểm trên đoạn thẳng nối hai điểm đó nên độ cao không đổi.
+- $R_0$ và $R_1$ là hướng tay ở điểm đầu và điểm cuối; $R(s)$ là hướng tại $s$.
+- $\mathrm{Slerp}$ (nội suy cầu) xoay đều từ $R_0$ tới $R_1$ theo $R(s) = R_0\exp\!\big(s\,\log(R_0^{\top}R_1)\big)$, tức quay theo một trục cố định với tốc độ góc không đổi. Ở V4 hai đầu có cùng yaw nên hướng giữ nguyên suốt đoạn.
+- Với mỗi $s$, code giải IK để ra góc khớp, khởi động từ nghiệm của $s$ trước nên không nhảy nhánh.
 
 Kết quả đo: khe 1-2 phích đi ở x = 0,530 m (tâm khe), z = 0,264 đến 0,267 m, khe 2-3 ở x = 0,797 m, z = 0,265 đến 0,268 m, đều thấp hơn đỉnh cột 0,30 m. cuRobo vẫn lập được kế hoạch không va chạm khi tay không xoay.
 
