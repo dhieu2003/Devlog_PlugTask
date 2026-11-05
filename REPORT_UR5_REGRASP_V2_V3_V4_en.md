@@ -14,30 +14,9 @@ About the data source: the original log does not attach the label "V2" to a spec
 
 ---
 
-## 1. Overall comparison
+## 1. V2: two faults while grasping and waving
 
-| Item | V2 | V3 | V4 |
-|---|---|---|---|
-| Cable in the gripper through gap 2-3 | slips (pad gap closes to 12.5 mm), one run ended in NaN | does not drop, max offset 17.9 mm | does not drop, max offset 6.5 mm |
-| Base joint rotation when approaching the cable | 286 deg | 23 deg | 23 deg |
-| Total base rotation during re-grasp | 687 deg | 240 deg | 240 deg |
-| Cable grip effort | 0.9 N m, proxy friction 0.7 | 2.2 N m, proxy friction 1.2 | 2.2 N m, proxy friction 1.2 |
-| IK solution choice | cuRobo's own | `ik_candidates`, least-rotation solution | same as V3 |
-| Wrist yaw while waving through the gaps | yes (-90 / +60 deg) | yes (-90 / +60 deg), wrist 6 turns about 106 deg into gap 2-3 | **0 deg** (`--wave-yaw-deg 0`) |
-| Plug displacement entering gap 2-3 | 1.2 to 3.6 mm (unstable) | 3.05 mm | **0.79 mm** |
-| Plug displacement after laying the cable | | 3.88 mm | **0.48 mm** (max 1.09 mm) |
-| Final housing-to-face gap | | 3.74 mm | **0.84 mm** |
-| Final pin lateral error | 0.64 mm | 0.66 mm | 0.37 mm |
-| Test criterion | still demands 0.2 mm | still demands 0.2 mm (fails) | plug still in socket and cable not dropped (passes) |
-| Cable dropped from the gripper | yes | no | no |
-
-The V2 plug displacement comes from runs of the original build (1.2 to 3.6 mm between runs, one run 11.9 mm then NaN). Empty cells mean the log has no value.
-
----
-
-## 2. V2: two faults while grasping and waving
-
-### 2.1 Fault A: needless full turn of the arm
+### 1.1 Fault A: needless full turn of the arm
 
 **Symptom.** When approaching the cable for the re-grasp, the base joint turns 286 degrees and wrist 6 turns 229 degrees. The total base rotation over the whole re-grasp phase is 687 degrees. The arm makes large unnecessary swings. While fixing this, the log also records one cuRobo branch that swung the gripper 3.04 m up to z = 1.14 m, jerked the cable and pulled the plug out, which blew up the simulation (NaN).
 
@@ -202,7 +181,7 @@ def hold_check(self, tag):
 
 ---
 
-## 3. V3: the wrist turns at gap 2-3 and displaces the plug
+## 2. V3: the wrist turns at gap 2-3 and displaces the plug
 
 **Symptom.** V3 has none of the V2 faults and runs the whole sequence, the plug stays inserted. But the plug is displaced 3.05 mm entering gap 2-3 and 3.88 mm after the cable is laid, with a final housing-to-face gap of 3.74 mm. The old test (which demands a 0.2 mm pin error) fails.
 
@@ -278,7 +257,7 @@ Measured result: at gap 1-2 the plug passes at x = 0.530 m (gap centre) and z = 
 
 ---
 
-## 4. V4: the finished version
+## 3. V4: the finished version
 
 V4 is V3 plus two changes: the wrist yaw while waving is set to 0, and the test drops the 0.2 mm pin tolerance (the new plan `plans/UR5_regrasp.md` no longer prescribes it). The test checks only two things: the cable did not slip out of the gripper and the plug is still in the socket (housing-to-face gap smaller than half the blade length):
 
@@ -291,6 +270,26 @@ assert args.tol is None or lateral < args.tol      # only checked when --tol is 
 V4full result: 959 s wall clock, 72.2 s simulated. A repeat run (`_V4full2`) gave almost the same numbers: plug displacement 0.474 mm, gap 0.86 mm, max deviation 1.07 mm. Accepted video: `video_ur5_regrasp_V4full.mp4`.
 
 V4 sequence: Home, approach, grasp the plug, lift, transport through the 3 posts, insert, release, retreat, re-grasp the cable (grasp at arc 0.78 m), wave through post 1, gap 1-2, post 2, gap 2-3, lay the cable aligned with the ground projection of the plug, return to Home.
+
+---
+## 4. Summation
+
+| Item | V2 | V3 | V4 |
+|---|---|---|---|
+| Cable in the gripper through gap 2-3 | slips (pad gap closes to 12.5 mm), one run ended in NaN | does not drop, max offset 17.9 mm | does not drop, max offset 6.5 mm |
+| Base joint rotation when approaching the cable | 286 deg | 23 deg | 23 deg |
+| Total base rotation during re-grasp | 687 deg | 240 deg | 240 deg |
+| Cable grip effort | 0.9 N m, proxy friction 0.7 | 2.2 N m, proxy friction 1.2 | 2.2 N m, proxy friction 1.2 |
+| IK solution choice | cuRobo's own | `ik_candidates`, least-rotation solution | same as V3 |
+| Wrist yaw while waving through the gaps | yes (-90 / +60 deg) | yes (-90 / +60 deg), wrist 6 turns about 106 deg into gap 2-3 | **0 deg** (`--wave-yaw-deg 0`) |
+| Plug displacement entering gap 2-3 | 1.2 to 3.6 mm (unstable) | 3.05 mm | **0.79 mm** |
+| Plug displacement after laying the cable | | 3.88 mm | **0.48 mm** (max 1.09 mm) |
+| Final housing-to-face gap | | 3.74 mm | **0.84 mm** |
+| Final pin lateral error | 0.64 mm | 0.66 mm | 0.37 mm |
+| Test criterion | still demands 0.2 mm | still demands 0.2 mm (fails) | plug still in socket and cable not dropped (passes) |
+| Cable dropped from the gripper | yes | no | no |
+
+The V2 plug displacement comes from runs of the original build (1.2 to 3.6 mm between runs, one run 11.9 mm then NaN). Empty cells mean the log has no value.
 
 ---
 
