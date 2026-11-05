@@ -13,6 +13,7 @@ Tổng hợp 5 câu hỏi về cách dựng robot, lập kế hoạch, hình h�
 8. [cuRobo kiểm tra va chạm: nhiều cầu và các hộp](#8-curobo-kiểm-tra-va-chạm-nhiều-cầu-và-các-hộp)
 9. [Link và khớp là gì](#9-link-và-khớp-là-gì)
 
+[<img width="1080" height="1080" alt="Image" src="https://github.com/user-attachments/assets/ef832995-0b90-4b4c-a0c9-49ccdbd7efe8" />](<img width="1080" height="1080" alt="Image" src="https://github.com/user-attachments/assets/ef832995-0b90-4b4c-a0c9-49ccdbd7efe8" />)
 ---
 
 ## 1. Đổi từ Franka sang UR5 + 2F-85 cần sửa gì
