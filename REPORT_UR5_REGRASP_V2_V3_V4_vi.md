@@ -48,7 +48,10 @@ Số liệu V2 ở hàng "phích dịch" lấy từ các lần chạy của bả
 
 Ở V2, bước `plan_pose` giao cho cuRobo tự giải IK và tự chọn nghiệm, không xét nghiệm đó cách tư thế hiện tại bao xa. Vì vậy có thể chọn nghiệm xa một vòng.
 
-**Giải pháp.** Ba thay đổi:
+**Giải pháp.** Ba thay đổi. Chúng giải hai bài toán khác nhau, cần tách rõ:
+
+- Thay đổi 1 và 2 dành cho đích cho dưới dạng **tư thế TCP** (vị trí và hướng). Một tư thế như vậy có nhiều nghiệm IK và ta phải chọn trong số đó.
+- Thay đổi 3 dành cho đích cho thẳng dưới dạng **góc khớp** (Home). Lúc này không có IK để giải và không có tập nghiệm để xếp hạng; vấn đề duy nhất là góc lưu sẵn có thể lệch góc hiện tại cả vòng.
 
 1. Sinh nhiều nghiệm IK rồi sắp theo độ dịch khớp lớn nhất so với tư thế hiện tại $q_{ref}$:
 
@@ -92,18 +95,26 @@ $$
    - $\mathrm{vee}(\cdot)$ đọc ma trận phản đối xứng $\begin{bmatrix}0&-c&b\\ c&0&-a\\ -b&a&0\end{bmatrix}$ thành vector $(a,b,c)$. Trong code: $e_R = \tfrac12\,(M_{32}-M_{23},\; M_{13}-M_{31},\; M_{21}-M_{12})$.
    - Kết quả là $\sin\theta\cdot \hat{n}$, với $\theta$ là góc còn thiếu và $\hat{n}$ là trục quay đơn vị. Với góc nhỏ thì $\approx \theta\,\hat{n}$ [rad], và bằng 0 khi hướng đã đúng.
 
-3. Khi về Home, đưa đích về dạng tương đương modulo $2\pi$ gần tư thế hiện tại nhất, để cổ tay không phải tháo xoắn:
+3. Khi về Home, đích đã là một bộ góc khớp cố định `HOME_Q = [0, -pi/2, pi/2, -pi/2, -pi/2, 0]`. Các góc lưu sẵn là một cách biểu diễn của tư thế Home, nhưng sau các chuyển động trước, góc hiện tại của một khớp có thể lệch nó cả vòng (ví dụ cổ tay đang ở +300 độ trong khi Home ghi -60 độ: cùng một tư thế, nhưng đi thẳng tới -60 độ thì cổ tay phải tháo xoắn khoảng 360 độ). Vì vậy đích được đổi sang bản tương đương modulo $2\pi$ gần góc hiện tại nhất:
 
 $$
 q_j' = \arg\min_{k\in\{-1,0,1\}} \left| q_j + 2\pi k - q_{cur,j} \right|,\qquad \left|q_j'\right| < 2\pi - 0.1
 $$
 
 Trong đó:
-- $q_j$ là góc đích của khớp $j$ [rad] (có thể là $q_j$ hoặc lệch cả vòng so với tư thế hiện tại).
+- $q_j$ là góc đích lưu sẵn của khớp $j$ [rad] (có thể lệch cả vòng so với góc hiện tại).
 - $q_{cur,j}$ là góc hiện tại của khớp $j$ [rad].
 - $k \in \{-1, 0, 1\}$ là số vòng đầy ($2\pi$) cộng hay trừ thêm. Góc $q_j + 2\pi k$ cho cùng một tư thế vật lý của khớp, chỉ khác số vòng quay.
 - $\arg\min$ chọn $k$ sao cho $q_j + 2\pi k$ gần $q_{cur,j}$ nhất, tức khớp quay đường ngắn nhất.
 - Điều kiện $|q_j'| < 2\pi - 0.1$ giữ góc chọn trong giới hạn khớp $\pm 2\pi$ của UR5 (trừ biên 0,1 rad). Giá trị $q_j'$ chọn được là góc đích cuối cùng của khớp $j$.
+
+Hai cơ chế được dùng ở các tầng khác nhau trong đường về Home (`ur5_regrasp_curobo_V4full.py`, phần "return"), theo thứ tự:
+1. Đích `q_home_u` (dùng $q_j'$), thử đường thẳng trong không gian khớp (`joint_line`).
+2. Nếu không đi được, nhờ cuRobo lập kế hoạch tới cùng `q_home_u` (`plan_cspace`).
+3. Nếu cuRobo thất bại, lúc này mới coi Home là một tư thế TCP và dùng `ik_candidates` (tức $D(q)$) lấy tối đa 10 nhánh IK gần cấu hình hiện tại nhất.
+4. Cuối cùng là `plan_pose` với IK riêng của cuRobo, code in cảnh báo "the wrist may unwind".
+
+Vậy $D(q)$ chỉ dùng cho đích là tư thế, và làm phương án dự phòng khi đường về Home thất bại ở bước 1 và 2. Bản thân nó cũng không khử độ lệch cả vòng: `ik_candidates` chạy IK từ các điểm khởi động quanh `q_ref` rồi sắp xếp kết quả, không liệt kê các bản $q \pm 2\pi$ của một nghiệm.
 
 Code (`ur5_regrasp_curobo_V4full.py`):
 
