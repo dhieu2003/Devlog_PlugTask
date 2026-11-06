@@ -14,11 +14,13 @@ The three versions compared:
 |---|---|
 | **V1** | Faults when grasping the cable: the arm makes a needless full turn, and the cable slips out of the gripper at gap 2-3 |
 | **V2** | Both faults above are gone, but the wrist turns at gap 2-3 and displaces the plug |
-| **V3** (`V3full`) | Finished and accepted |
+| **V3** | Finished and accepted |
 
 ---
 
 ## 1. V1: two faults while grasping and waving
+
+[https://github.com/user-attachments/assets/7ce4fc58-5a05-49f0-a0ee-8c894b114966](https://github.com/user-attachments/assets/7ce4fc58-5a05-49f0-a0ee-8c894b114966)
 
 ### 1.1 Fault A: needless full turn of the arm
 
@@ -139,7 +141,7 @@ In addition, when a leg cannot be done with a straight line, the cuRobo option w
 | Total base rotation in re-grasp | 687 deg | **240 deg** |
 | Return to Home | the wrist may unwind about 300 deg | straight line in joint space, at most 77 deg on one joint |
 
-### 2.2 Fault B: the cable slips out of the gripper at gap 2-3
+### 1.2 Fault B: the cable slips out of the gripper at gap 2-3
 
 **Symptom.** On the leg from post 2 to gap 2-3 the cable slowly slides out of the pads: the cable height drops from z = 0.26 m to 0.02 m and the pad gap closes to 12.5 mm. One run ended in NaN.
 
@@ -186,6 +188,8 @@ def hold_check(self, tag):
 ---
 
 ## 2. V2: the wrist turns at gap 2-3 and displaces the plug
+
+[https://github.com/user-attachments/assets/ce6821e9-a67b-48cd-8ddf-77620a30ea3a](https://github.com/user-attachments/assets/ce6821e9-a67b-48cd-8ddf-77620a30ea3a)
 
 **Symptom.** V2 has none of the V1 faults and runs the whole sequence, the plug stays inserted. But the plug is displaced 3.05 mm entering gap 2-3 and 3.88 mm after the cable is laid, with a final housing-to-face gap of 3.74 mm. The old test (which demands a 0.2 mm pin error) fails.
 
@@ -262,6 +266,8 @@ Measured result: at gap 1-2 the plug passes at x = 0.530 m (gap centre) and z = 
 ---
 
 ## 3. V3: the finished version
+
+[https://github.com/user-attachments/assets/0e6b3166-2709-4389-bab7-b95fe0e6647e](https://github.com/user-attachments/assets/0e6b3166-2709-4389-bab7-b95fe0e6647e)
 
 V3 is V2 plus two changes: the wrist yaw while waving is set to 0, and the test drops the 0.2 mm pin tolerance (the new plan `plans/UR5_regrasp.md` no longer prescribes it). The test checks only two things: the cable did not slip out of the gripper and the plug is still in the socket (housing-to-face gap smaller than half the blade length):
 
