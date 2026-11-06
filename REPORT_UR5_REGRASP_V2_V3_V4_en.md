@@ -168,11 +168,7 @@ Where:
 - $k_{stretch}$ [N/m] is the stretching stiffness of one segment: stretching it by 1 m would produce 15 700 N (linear estimate).
 - $k_{bend}$ [N m/rad] is the bending stiffness of one joint between two segments: bending it by 1 rad produces a moment of 0.098 N m.
 
-These two numbers match the values used by the VBD simulator (stated in the log): the cable is rather soft in bending and very stiff in stretching. They are material constants that give the reader a feeling for the cable stiffness; they are not a calculation that directly proves the plug displacement.
-
-The causal evidence is fairly strong: between V2 and V3 only the wrist yaw (and the test criterion) changed, so the drop in plug displacement is due to removing the yaw. The specific mechanism (twisting and pulling the cable) is the explanation given in the log and was not isolated by a separate experiment.
-
-**Fix.** Remove the wrist yaw while waving during the re-grasp. The wave waypoints use yaw 0 instead of the yaw of the transport path (the transport path used for the insertion keeps its yaw):
+The causal evidence is fairly strong: between V2 and V3 only the wrist yaw (and the test criterion) changed, so the drop in plug displacement is due to removing the yaw.
 
 The gap crossings remain straight Cartesian segments at constant height and orientation:
 
