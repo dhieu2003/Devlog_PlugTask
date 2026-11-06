@@ -93,16 +93,6 @@ Where:
 - $\arg\min$ picks the $k$ for which $q_j + 2\pi k$ is closest to $q_{cur,j}$, i.e. the joint takes the shortest way.
 - The condition $|q_j'| < 2\pi - 0.1$ keeps the chosen angle inside the UR5 joint limit $\pm 2\pi$ (with a 0.1 rad margin). The selected $q_j'$ is the final goal angle of joint $j$.
 
-How the two mechanisms are used in the return to Home (`ur5_regrasp_curobo_V3full.py`, "return" section), in this order:
-1. Goal `q_home_u` (uses $q_j'$), try a straight line in joint space (`joint_line`).
-2. If that is not possible, let cuRobo plan to the same `q_home_u` (`plan_cspace`).
-3. If cuRobo fails, only then is Home treated as a TCP pose and `ik_candidates` (that is, $D(q)$) supplies up to 10 IK branches closest to the current configuration.
-4. Last resort: `plan_pose` with cuRobo's own IK; the code prints a warning "the wrist may unwind".
-
-So $D(q)$ is used only for goals that are poses, and as a fallback when the return to Home fails at steps 1 and 2. It also does not remove whole-turn offsets by itself: `ik_candidates` runs IK from start points around `q_ref` and sorts the results, it does not enumerate the $q \pm 2\pi$ copies of a solution.
-
-In addition, when a leg cannot be done with a straight line, the cuRobo option with the **shortest** gripper path is chosen (the rejected branch swung 3.04 m, the chosen one only 1.0 m with z max 0.38 m), and a 15 cm sideways step away from the posts (`rg_clear`) is added before the return to Home is planned.
-
 **Result.**
 
 | | V1 | V2 and V3 |
