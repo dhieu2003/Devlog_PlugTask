@@ -109,7 +109,7 @@ Where:
 **Cause (according to the log).** A cable grip effort of 0.9 N m and a friction coefficient of 0.7 on the proxy body were both too low, so the cable could not be held while it was pulled through the gap. The no-slip condition is that the tangential force on the cable does not exceed the friction of the two pads:
 
 $$
-F_{t} \le 2\\muF_n
+F_{t} \le 2\\mu\\F_n
 $$
 
 Where:
