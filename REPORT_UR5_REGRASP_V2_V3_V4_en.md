@@ -101,35 +101,6 @@ How the two mechanisms are used in the return to Home (`ur5_regrasp_curobo_V3ful
 
 So $D(q)$ is used only for goals that are poses, and as a fallback when the return to Home fails at steps 1 and 2. It also does not remove whole-turn offsets by itself: `ik_candidates` runs IK from start points around `q_ref` and sorts the results, it does not enumerate the $q \pm 2\pi$ copies of a solution.
 
-Code (`ur5_regrasp_curobo_V3full.py`):
-
-```python
-def ik_candidates(p, r, q_ref, tries=120, seed=1):
-    rng = np.random.default_rng(seed)
-    sols = []
-    def add(q0):
-        q, err = G.ik(p, r, q0, iters=300)
-        if err < 1e-4 and np.all(np.abs(q) < 2*np.pi - 0.05) \
-           and not any(np.linalg.norm(q - s) < 1e-3 for s in sols):
-            sols.append(q)
-    for k in range(tries):                       # stage 1: noise around q_ref
-        add(q_ref if k == 0 else q_ref + rng.normal(0.0, 0.3 if k < tries//2 else 0.9, 6))
-    if len(sols) < 4:                            # stage 2: uniform starts in [-pi, pi]
-        rng2 = np.random.default_rng(seed + 1)
-        for _ in range(2*tries):
-            add(rng2.uniform(-np.pi, np.pi, 6))
-    sols.sort(key=lambda q: float(np.max(np.abs(q - q_ref))))   # smallest D(q) first
-    return sols
-
-def unwrap_goal(q_goal, q_cur):
-    out = np.array(q_goal, float)
-    for j in range(len(out)):
-        cands = [q_goal[j] + 2*np.pi*k for k in (-1, 0, 1)]
-        cands = [c for c in cands if abs(c) < 2*np.pi - 0.1]
-        out[j] = min(cands, key=lambda c: abs(c - q_cur[j]))
-    return out
-```
-
 In addition, when a leg cannot be done with a straight line, the cuRobo option with the **shortest** gripper path is chosen (the rejected branch swung 3.04 m, the chosen one only 1.0 m with z max 0.38 m), and a 15 cm sideways step away from the posts (`rg_clear`) is added before the return to Home is planned.
 
 **Result.**
@@ -164,22 +135,6 @@ The two changes (grip effort and friction) raise both factors $F_n$ and $\mu$ of
 
 - Cable grip effort 0.9 to 2.2 N m (`--cable-grip-effort`), proxy friction 0.7 to 1.2.
 - Added monitoring: measure the distance between the proxy body and the TCP; if it is above 3 cm the cable is considered slipped and `--test` fails.
-
-```python
-# high friction of the pinched cable section (proxy)
-pxc = newton.ModelBuilder.ShapeConfig(ke=CONTACT_KE, kd=0.0, mu=1.2, mu_torsional=MU_TORSION,
-                                      margin=0.0, gap=0.0, density=0.0, is_visible=False)
-
-# slip monitor
-def hold_check(self, tag):
-    pq  = self.s0.body_q.numpy()[self.proxy_body, :3].astype(np.float64)
-    tcp, _ = G.fk(self.robot_q())
-    d = float(np.linalg.norm(pq - tcp))          # d = || p_proxy - p_TCP ||
-    self.hold_dist_max = max(self.hold_dist_max, d)
-    if d > 0.03:                                  # > 3 cm: slipped out
-        self.cable_dropped = True
-    return d
-```
 
 **Result.** The cable no longer slips in V2 and V3. Maximum offset between the cable and the grasp centre: V2 17.9 mm, V3 6.5 mm (both below the 3 cm threshold of `hold_check`).
 
@@ -229,16 +184,6 @@ The causal evidence is fairly strong: between V2 and V3 only the wrist yaw (and 
 
 **Fix.** Remove the wrist yaw while waving during the re-grasp. The wave waypoints use yaw 0 instead of the yaw of the transport path (the transport path used for the insertion keeps its yaw):
 
-```python
-# --wave-yaw-deg: default 0 (V3); None would use the original yaw of the transport path
-p.add_argument("--wave-yaw-deg", type=float, default=0.0)
-
-fwd = G.weave_waypoints()[:6]    # post1, gap12 in/out, post2, gap23 in/out
-wave = [(n, [float(v) for v in w],
-         float(y if a.wave_yaw_deg is None else np.deg2rad(a.wave_yaw_deg)))
-        for n, w, y in fwd]
-```
-
 The gap crossings remain straight Cartesian segments at constant height and orientation:
 
 $$
@@ -270,12 +215,6 @@ Measured result: at gap 1-2 the plug passes at x = 0.530 m (gap centre) and z = 
 [https://github.com/user-attachments/assets/0e6b3166-2709-4389-bab7-b95fe0e6647e](https://github.com/user-attachments/assets/0e6b3166-2709-4389-bab7-b95fe0e6647e)
 
 V3 is V2 plus two changes: the wrist yaw while waving is set to 0, and the test drops the 0.2 mm pin tolerance (the new plan `plans/UR5_regrasp.md` no longer prescribes it). The test checks only two things: the cable did not slip out of the gripper and the plug is still in the socket (housing-to-face gap smaller than half the blade length):
-
-```python
-assert not ex.cable_dropped, "the cable slipped out of the gripper during the wave"
-assert gap < 0.5 * G.BLADE_LEN * 1000, "plug was pulled out of the socket"
-assert args.tol is None or lateral < args.tol      # only checked when --tol is given
-```
 
 V3full result: 959 s wall clock, 72.2 s simulated. A repeat run (`_V3full2`) gave almost the same numbers: plug displacement 0.474 mm, gap 0.86 mm, max deviation 1.07 mm. Accepted video: `video_ur5_regrasp_V3full.mp4`.
 
@@ -310,17 +249,3 @@ The V1 plug displacement comes from runs of the original build (1.2 to 3.6 mm be
 3. Each configuration was run once; the GPU is non-deterministic, so results differ by 0.01 to 0.1 mm (a few mm in older versions).
 4. Collisions between the gripper and the posts when the hand does not turn were not checked by eye.
 5. Lowering the path height to z = 0.20 m (so the cable looks as if it goes between the posts) failed at planning (`cuRobo failed to plan 'weave leg 3.0 (-> post2)'`); the cause has not been verified.
-
----
-
-## 6. How to re-run V3
-
-```
-cd data/scripts
-python ur5_build_assets_V3.py                                  # once
-REGRASP_TAG=_V3full3 python ur5_regrasp_V3full.py --test       # new tag so results are not overwritten
-python ur5_regrasp_render_isaac_V3full.py --stride 3 \
-    --traj ../results/ur5_regrasp_V3full3_traj.npz \
-    --shapes ../results/ur5_regrasp_V3full3_shapes.pkl \
-    --out ../results/video_ur5_regrasp_V3full3.mp4
-```
