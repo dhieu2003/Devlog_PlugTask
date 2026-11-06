@@ -1,6 +1,7 @@
 # Comparison of V2, V3 and V4: UR5 plug insertion and cable re-grasp
 
 Task: a real UR5 (not the UR5e) with a Robotiq 2F-85 gripper picks up a plug at the end of a cable, threads it through 3 posts, inserts it into a wall socket, releases it, then comes back, grasps the cable, waves it through post 1, gap 1-2, post 2 and gap 2-3, and lays it on the floor. At the end the plug must still be in the socket.
+The Re-grasp point:    0.15 <= d <= 0.62
 
 The three versions compared:
 
@@ -9,8 +10,6 @@ The three versions compared:
 | **V2** | Faults when grasping the cable: the arm makes a needless full turn, and the cable slips out of the gripper at gap 2-3 |
 | **V3** | Both faults above are gone, but the wrist turns at gap 2-3 and displaces the plug |
 | **V4** (`V4full`) | Finished and accepted |
-
-About the data source: the original log does not attach the label "V2" to a specific build. The V2 faults described here (286 degree needless rotation, cable slipping at gap 2-3) are recorded in the log for the original build before the V1 fixes, so the V2 numbers come from the "original" column of the log. V3 is a copy of V1 (which already carries those fixes) and V4 is V3 plus the wrist-yaw change. The old V2 and V3 scripts were deleted during a folder cleanup, so the code in this report is taken from `V4full`, where the fixes are still present.
 
 ---
 
