@@ -1,7 +1,10 @@
 # Comparison of V2, V3 and V4: UR5 plug insertion and cable re-grasp
 
 Task: a real UR5 (not the UR5e) with a Robotiq 2F-85 gripper picks up a plug at the end of a cable, threads it through 3 posts, inserts it into a wall socket, releases it, then comes back, grasps the cable, waves it through post 1, gap 1-2, post 2 and gap 2-3, and lays it on the floor. At the end the plug must still be in the socket.
-The Re-grasp point:    0.15 <= d <= 0.62
+
+The Re-grasp point:    
+$0.15 \le d \le 0.62$
+
 
 The three versions compared:
 
