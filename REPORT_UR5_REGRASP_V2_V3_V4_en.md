@@ -1,4 +1,4 @@
-# Comparison of V2, V3 and V4: UR5 plug insertion and cable re-grasp
+# Comparison of V1, V2 and V3: UR5 plug insertion and cable re-grasp
 
 Task: a real UR5 (not the UR5e) with a Robotiq 2F-85 gripper picks up a plug at the end of a cable, threads it through 3 posts, inserts it into a wall socket, releases it, then comes back, grasps the cable, waves it through post 1, gap 1-2, post 2 and gap 2-3, and lays it on the floor. At the end the plug must still be in the socket. 
 
@@ -12,13 +12,13 @@ The three versions compared:
 
 | Version | Status |
 |---|---|
-| **V2** | Faults when grasping the cable: the arm makes a needless full turn, and the cable slips out of the gripper at gap 2-3 |
-| **V3** | Both faults above are gone, but the wrist turns at gap 2-3 and displaces the plug |
-| **V4** (`V4full`) | Finished and accepted |
+| **V1** | Faults when grasping the cable: the arm makes a needless full turn, and the cable slips out of the gripper at gap 2-3 |
+| **V2** | Both faults above are gone, but the wrist turns at gap 2-3 and displaces the plug |
+| **V3** (`V3full`) | Finished and accepted |
 
 ---
 
-## 1. V2: two faults while grasping and waving
+## 1. V1: two faults while grasping and waving
 
 ### 1.1 Fault A: needless full turn of the arm
 
@@ -29,7 +29,7 @@ The three versions compared:
 - The UR5 has several IK branches (shoulder, elbow, wrist flips).
 - Every joint has a limit of $\pm 2\pi$, so $q_j$ and $q_j \pm 2\pi$ give the same pose. A solution can be off by exactly one full turn from the current pose.
 
-In V2, `plan_pose` left cuRobo to solve the IK and choose the solution itself, without considering how far that solution is from the current pose. So it could pick a solution a full turn away.
+In V1, `plan_pose` left cuRobo to solve the IK and choose the solution itself, without considering how far that solution is from the current pose. So it could pick a solution a full turn away.
 
 **Fix.** Three changes. They solve two different problems, which are kept apart below:
 
@@ -91,7 +91,7 @@ Where:
 - $\arg\min$ picks the $k$ for which $q_j + 2\pi k$ is closest to $q_{cur,j}$, i.e. the joint takes the shortest way.
 - The condition $|q_j'| < 2\pi - 0.1$ keeps the chosen angle inside the UR5 joint limit $\pm 2\pi$ (with a 0.1 rad margin). The selected $q_j'$ is the final goal angle of joint $j$.
 
-How the two mechanisms are used in the return to Home (`ur5_regrasp_curobo_V4full.py`, "return" section), in this order:
+How the two mechanisms are used in the return to Home (`ur5_regrasp_curobo_V3full.py`, "return" section), in this order:
 1. Goal `q_home_u` (uses $q_j'$), try a straight line in joint space (`joint_line`).
 2. If that is not possible, let cuRobo plan to the same `q_home_u` (`plan_cspace`).
 3. If cuRobo fails, only then is Home treated as a TCP pose and `ik_candidates` (that is, $D(q)$) supplies up to 10 IK branches closest to the current configuration.
@@ -99,7 +99,7 @@ How the two mechanisms are used in the return to Home (`ur5_regrasp_curobo_V4ful
 
 So $D(q)$ is used only for goals that are poses, and as a fallback when the return to Home fails at steps 1 and 2. It also does not remove whole-turn offsets by itself: `ik_candidates` runs IK from start points around `q_ref` and sorts the results, it does not enumerate the $q \pm 2\pi$ copies of a solution.
 
-Code (`ur5_regrasp_curobo_V4full.py`):
+Code (`ur5_regrasp_curobo_V3full.py`):
 
 ```python
 def ik_candidates(p, r, q_ref, tries=120, seed=1):
@@ -132,7 +132,7 @@ In addition, when a leg cannot be done with a straight line, the cuRobo option w
 
 **Result.**
 
-| | V2 | V3 and V4 |
+| | V1 | V2 and V3 |
 |---|---|---|
 | Base joint rotation on approach | 286 deg | **23 deg** |
 | Wrist joint 6 on approach | 229 deg | 171 deg (needed to orient the gripper) |
@@ -152,7 +152,7 @@ $$
 Where:
 - $F_t$ [N] is the force along the cable (tangent to the pad surface) that the cable exerts on the grasp, that is, the pull that tries to slide the cable out of the pads while the hand moves through the gap.
 - $F_n$ [N] is the normal force with which each pad presses on the cable. It is set by the torque limit of the gripper motor (`--cable-grip-effort`): the larger the torque, the harder the pressing.
-- $\mu$ (dimensionless) is the friction coefficient between the pads and the pinched cable section (in the code it is set on the cable proxy body: 0.7 in V2, 1.2 in V3 and V4).
+- $\mu$ (dimensionless) is the friction coefficient between the pads and the pinched cable section (in the code it is set on the cable proxy body: 0.7 in V1, 1.2 in V2 and V3).
 - The factor $2$ is there because there are two pads, each giving a maximum friction force of $\mu F_n$.
 - The right-hand side $2\mu F_n$ [N] is the largest friction force that keeps the cable from sliding. If $F_t$ exceeds it, the cable slides (slips out).
 
@@ -179,15 +179,15 @@ def hold_check(self, tag):
     return d
 ```
 
-**Result.** The cable no longer slips in V3 and V4. Maximum offset between the cable and the grasp centre: V3 17.9 mm, V4 6.5 mm (both below the 3 cm threshold of `hold_check`).
+**Result.** The cable no longer slips in V2 and V3. Maximum offset between the cable and the grasp centre: V2 17.9 mm, V3 6.5 mm (both below the 3 cm threshold of `hold_check`).
 
-**Limits of this analysis.** The two changes (grip effort and friction) were applied together, so how much each one contributes is not known. The cable force on the plug that was measured is only about 0.4 to 3.5 N, well below the estimated friction capacity of the two pads, so the static force balance above does not fully explain why the cable slipped in V2. Separating the effects would need runs with each change on its own.
+**Limits of this analysis.** The two changes (grip effort and friction) were applied together, so how much each one contributes is not known. The cable force on the plug that was measured is only about 0.4 to 3.5 N, well below the estimated friction capacity of the two pads, so the static force balance above does not fully explain why the cable slipped in V1. Separating the effects would need runs with each change on its own.
 
 ---
 
-## 2. V3: the wrist turns at gap 2-3 and displaces the plug
+## 2. V2: the wrist turns at gap 2-3 and displaces the plug
 
-**Symptom.** V3 has none of the V2 faults and runs the whole sequence, the plug stays inserted. But the plug is displaced 3.05 mm entering gap 2-3 and 3.88 mm after the cable is laid, with a final housing-to-face gap of 3.74 mm. The old test (which demands a 0.2 mm pin error) fails.
+**Symptom.** V2 has none of the V1 faults and runs the whole sequence, the plug stays inserted. But the plug is displaced 3.05 mm entering gap 2-3 and 3.88 mm after the cable is laid, with a final housing-to-face gap of 3.74 mm. The old test (which demands a 0.2 mm pin error) fails.
 
 **Cause.** The wave waypoints are taken from the transport path used for the insertion, where the hand has a yaw $\psi = -90^\circ$ at gap 1-2 and $+60^\circ$ at gap 2-3. The hand orientation function is:
 
@@ -202,7 +202,7 @@ Where:
 - $R_z(\psi)$ and $R_y(\theta)$ are the elementary rotation matrices about the Z and Y axes.
 - $R_0 = \begin{bmatrix}0&1&0\\-1&0&0\\0&0&1\end{bmatrix}$ is the base orientation of wrist 3 (the columns are the wrist x, y, z axes in the world frame) when there is no yaw and no tilt.
 
-So $\psi$ is the quantity that was changed: V2 and V3 use $\psi=-90^\circ$ at gap 1-2 and $+60^\circ$ at gap 2-3, while V4 uses $\psi = 0$.
+So $\psi$ is the quantity that was changed: V1 and V2 use $\psi=-90^\circ$ at gap 1-2 and $+60^\circ$ at gap 2-3, while V3 uses $\psi = 0$.
 
 During the insertion the hand holds the plug and the cable still has slack, so turning the yaw is harmless. During the re-grasp it is different: the plug is already fixed in the socket and the hand grips the cable at arc 0.78 m out of 1.6 m. Turning the yaw makes wrist 6 rotate about 106 degrees on the leg into gap 2-3, which twists and pulls the cable, and that force reaches the plug. The cable has the following stiffness (E = 5·10⁶ Pa, radius 5 mm, 64 segments of length $\ell = 25$ mm):
 
@@ -221,12 +221,12 @@ Where:
 
 These two numbers match the values used by the VBD simulator (stated in the log): the cable is rather soft in bending and very stiff in stretching. They are material constants that give the reader a feeling for the cable stiffness; they are not a calculation that directly proves the plug displacement.
 
-The causal evidence is fairly strong: between V3 and V4 only the wrist yaw (and the test criterion) changed, so the drop in plug displacement is due to removing the yaw. The specific mechanism (twisting and pulling the cable) is the explanation given in the log and was not isolated by a separate experiment.
+The causal evidence is fairly strong: between V2 and V3 only the wrist yaw (and the test criterion) changed, so the drop in plug displacement is due to removing the yaw. The specific mechanism (twisting and pulling the cable) is the explanation given in the log and was not isolated by a separate experiment.
 
 **Fix.** Remove the wrist yaw while waving during the re-grasp. The wave waypoints use yaw 0 instead of the yaw of the transport path (the transport path used for the insertion keeps its yaw):
 
 ```python
-# --wave-yaw-deg: default 0 (V4); None would use the original yaw of the transport path
+# --wave-yaw-deg: default 0 (V3); None would use the original yaw of the transport path
 p.add_argument("--wave-yaw-deg", type=float, default=0.0)
 
 fwd = G.weave_waypoints()[:6]    # post1, gap12 in/out, post2, gap23 in/out
@@ -245,14 +245,14 @@ Where:
 - $s$ is a dimensionless interpolation parameter going from 0 (start) to 1 (end); it is not the arc length of the cable.
 - $p_0$ and $p_1$ are the TCP positions at the start and the end of the gap crossing [m]; $p(s)$ is the TCP position at $s$, a point on the straight segment joining them, so the height stays constant.
 - $R_0$ and $R_1$ are the hand orientations at the start and the end; $R(s)$ is the orientation at $s$.
-- $\mathrm{Slerp}$ (spherical interpolation) turns evenly from $R_0$ to $R_1$ following $R(s) = R_0\exp\!\big(s\,\log(R_0^{\top}R_1)\big)$, that is, a rotation about a fixed axis at constant angular speed. In V4 both ends have the same yaw, so the orientation stays unchanged along the segment.
+- $\mathrm{Slerp}$ (spherical interpolation) turns evenly from $R_0$ to $R_1$ following $R(s) = R_0\exp\!\big(s\,\log(R_0^{\top}R_1)\big)$, that is, a rotation about a fixed axis at constant angular speed. In V3 both ends have the same yaw, so the orientation stays unchanged along the segment.
 - For every $s$ the code solves IK for the joint angles, starting from the solution of the previous $s$, so it does not jump between branches.
 
 Measured result: at gap 1-2 the plug passes at x = 0.530 m (gap centre) and z = 0.264 to 0.267 m, at gap 2-3 at x = 0.797 m and z = 0.265 to 0.268 m, all below the post top at 0.30 m. cuRobo still finds collision-free plans when the hand does not turn.
 
-**Result (V3 vs V4).**
+**Result (V2 vs V3).**
 
-| | V3 | V4 |
+| | V2 | V3 |
 |---|---|---|
 | Plug displacement entering gap 2-3 | 3.05 mm | **0.79 mm** |
 | Plug displacement after laying the cable | 3.88 mm | **0.48 mm** (max 1.09 mm during re-grasp) |
@@ -261,9 +261,9 @@ Measured result: at gap 1-2 the plug passes at x = 0.530 m (gap centre) and z = 
 
 ---
 
-## 3. V4: the finished version
+## 3. V3: the finished version
 
-V4 is V3 plus two changes: the wrist yaw while waving is set to 0, and the test drops the 0.2 mm pin tolerance (the new plan `plans/UR5_regrasp.md` no longer prescribes it). The test checks only two things: the cable did not slip out of the gripper and the plug is still in the socket (housing-to-face gap smaller than half the blade length):
+V3 is V2 plus two changes: the wrist yaw while waving is set to 0, and the test drops the 0.2 mm pin tolerance (the new plan `plans/UR5_regrasp.md` no longer prescribes it). The test checks only two things: the cable did not slip out of the gripper and the plug is still in the socket (housing-to-face gap smaller than half the blade length):
 
 ```python
 assert not ex.cable_dropped, "the cable slipped out of the gripper during the wave"
@@ -271,20 +271,20 @@ assert gap < 0.5 * G.BLADE_LEN * 1000, "plug was pulled out of the socket"
 assert args.tol is None or lateral < args.tol      # only checked when --tol is given
 ```
 
-V4full result: 959 s wall clock, 72.2 s simulated. A repeat run (`_V4full2`) gave almost the same numbers: plug displacement 0.474 mm, gap 0.86 mm, max deviation 1.07 mm. Accepted video: `video_ur5_regrasp_V4full.mp4`.
+V3full result: 959 s wall clock, 72.2 s simulated. A repeat run (`_V3full2`) gave almost the same numbers: plug displacement 0.474 mm, gap 0.86 mm, max deviation 1.07 mm. Accepted video: `video_ur5_regrasp_V3full.mp4`.
 
-V4 sequence: Home, approach, grasp the plug, lift, transport through the 3 posts, insert, release, retreat, re-grasp the cable (grasp at arc 0.78 m), wave through post 1, gap 1-2, post 2, gap 2-3, lay the cable aligned with the ground projection of the plug, return to Home.
+V3 sequence: Home, approach, grasp the plug, lift, transport through the 3 posts, insert, release, retreat, re-grasp the cable (grasp at arc 0.78 m), wave through post 1, gap 1-2, post 2, gap 2-3, lay the cable aligned with the ground projection of the plug, return to Home.
 
 ---
 ## 4. Summation
 
-| Item | V2 | V3 | V4 |
+| Item | V1 | V2 | V3 |
 |---|---|---|---|
 | Cable in the gripper through gap 2-3 | slips (pad gap closes to 12.5 mm), one run ended in NaN | does not drop, max offset 17.9 mm | does not drop, max offset 6.5 mm |
 | Base joint rotation when approaching the cable | 286 deg | 23 deg | 23 deg |
 | Total base rotation during re-grasp | 687 deg | 240 deg | 240 deg |
 | Cable grip effort | 0.9 N m, proxy friction 0.7 | 2.2 N m, proxy friction 1.2 | 2.2 N m, proxy friction 1.2 |
-| IK solution choice | cuRobo's own | `ik_candidates`, least-rotation solution | same as V3 |
+| IK solution choice | cuRobo's own | `ik_candidates`, least-rotation solution | same as V2 |
 | Wrist yaw while waving through the gaps | yes (-90 / +60 deg) | yes (-90 / +60 deg), wrist 6 turns about 106 deg into gap 2-3 | **0 deg** (`--wave-yaw-deg 0`) |
 | Plug displacement entering gap 2-3 | 1.2 to 3.6 mm (unstable) | 3.05 mm | **0.79 mm** |
 | Plug displacement after laying the cable | | 3.88 mm | **0.48 mm** (max 1.09 mm) |
@@ -293,11 +293,11 @@ V4 sequence: Home, approach, grasp the plug, lift, transport through the 3 posts
 | Test criterion | still demands 0.2 mm | still demands 0.2 mm (fails) | plug still in socket and cable not dropped (passes) |
 | Cable dropped from the gripper | yes | no | no |
 
-The V2 plug displacement comes from runs of the original build (1.2 to 3.6 mm between runs, one run 11.9 mm then NaN). Empty cells mean the log has no value.
+The V1 plug displacement comes from runs of the original build (1.2 to 3.6 mm between runs, one run 11.9 mm then NaN). Empty cells mean the log has no value.
 
 ---
 
-## 5. What is still open in V4
+## 5. What is still open in V3
 
 1. The pin lateral error after release is still 0.37 mm, above the 0.2 mm of the old plan (tilt about 2.5 degrees, soft penalty contacts with ke = 1e5). It is simply no longer a criterion of the test.
 2. The cable section in the gripper is kinematic (a single proxy body), so there is no cable force on the pads. Full two-way coupling exists only at the plug.
@@ -307,14 +307,14 @@ The V2 plug displacement comes from runs of the original build (1.2 to 3.6 mm be
 
 ---
 
-## 6. How to re-run V4
+## 6. How to re-run V3
 
 ```
 cd data/scripts
-python ur5_build_assets_V4.py                                  # once
-REGRASP_TAG=_V4full3 python ur5_regrasp_V4full.py --test       # new tag so results are not overwritten
-python ur5_regrasp_render_isaac_V4full.py --stride 3 \
-    --traj ../results/ur5_regrasp_V4full3_traj.npz \
-    --shapes ../results/ur5_regrasp_V4full3_shapes.pkl \
-    --out ../results/video_ur5_regrasp_V4full3.mp4
+python ur5_build_assets_V3.py                                  # once
+REGRASP_TAG=_V3full3 python ur5_regrasp_V3full.py --test       # new tag so results are not overwritten
+python ur5_regrasp_render_isaac_V3full.py --stride 3 \
+    --traj ../results/ur5_regrasp_V3full3_traj.npz \
+    --shapes ../results/ur5_regrasp_V3full3_shapes.pkl \
+    --out ../results/video_ur5_regrasp_V3full3.mp4
 ```
