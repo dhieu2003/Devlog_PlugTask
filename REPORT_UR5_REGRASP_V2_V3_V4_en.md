@@ -141,7 +141,7 @@ The two changes (grip effort and friction) raise both factors $F_n$ and $\mu$ of
 **Cause.** The wave waypoints are taken from the transport path used for the insertion, where the hand has a yaw $\psi = -90^\circ$ at gap 1-2 and $+60^\circ$ at gap 2-3. The hand orientation function is:
 
 $$
-R_{tool}(\psi,\theta) = R_z(\psi)\R_y(\theta)\R_0\qquad \theta = 40^\circ\ (\text{tilt})
+R_{tool}(\psi,\theta) = R_z(\psi)R_y(\theta)R_0\qquad \theta = 40^\circ\ (\text{tilt})
 $$
 
 Where:
