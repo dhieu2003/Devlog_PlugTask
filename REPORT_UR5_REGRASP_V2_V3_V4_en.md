@@ -70,7 +70,7 @@ $$
    The orientation error $e_R$ is taken from the skew-symmetric part of the missing rotation matrix:
 
 $$
-e_R = \tfrac12\,\mathrm{vee}\!\left(R_{t}R_{c}^{\top} - \left(R_{t}R_{c}^{\top}\right)^{\top}\right)
+e_R = \tfrac12\mathrm{vee}\left(R_{t}R_{c}^{\top} - \left(R_{t}R_{c}^{\top}\right)^{\top}\right)
 $$
 
    Where:
