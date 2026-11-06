@@ -170,19 +170,6 @@ Where:
 
 The causal evidence is fairly strong: between V2 and V3 only the wrist yaw (and the test criterion) changed, so the drop in plug displacement is due to removing the yaw.
 
-The gap crossings remain straight Cartesian segments at constant height and orientation:
-
-$$
-p(s) = p_0 + s\,(p_1 - p_0),\qquad R(s) = \mathrm{Slerp}(R_0, R_1; s),\qquad s\in[0,1]
-$$
-
-Where:
-- $s$ is a dimensionless interpolation parameter going from 0 (start) to 1 (end); it is not the arc length of the cable.
-- $p_0$ and $p_1$ are the TCP positions at the start and the end of the gap crossing [m]; $p(s)$ is the TCP position at $s$, a point on the straight segment joining them, so the height stays constant.
-- $R_0$ and $R_1$ are the hand orientations at the start and the end; $R(s)$ is the orientation at $s$.
-- $\mathrm{Slerp}$ (spherical interpolation) turns evenly from $R_0$ to $R_1$ following $R(s) = R_0\exp\!\big(s\,\log(R_0^{\top}R_1)\big)$, that is, a rotation about a fixed axis at constant angular speed. In V3 both ends have the same yaw, so the orientation stays unchanged along the segment.
-- For every $s$ the code solves IK for the joint angles, starting from the solution of the previous $s$, so it does not jump between branches.
-
 Measured result: at gap 1-2 the plug passes at x = 0.530 m (gap centre) and z = 0.264 to 0.267 m, at gap 2-3 at x = 0.797 m and z = 0.265 to 0.268 m, all below the post top at 0.30 m. cuRobo still finds collision-free plans when the hand does not turn.
 
 **Result (V2 vs V3).**
