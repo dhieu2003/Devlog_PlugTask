@@ -6,7 +6,7 @@ Tài liệu này gộp công việc của bốn ngày 11, 12, 13, 14/11/2026. V�
 
 | Lỗi | Nguyên nhân | Giải pháp | Kết quả |
 |---|---|---|---|
-| **A. Cánh tay tự va chạm** (V1, V2; V4 chỉ "không va chạm" nhờ nghiệm phù hợp) | cuRobo **có** kiểm tra tự va chạm (cầu của `ur5.yml`, ràng buộc nhị phân) nhưng chỉ cho các đoạn nó tối ưu; các đoạn thẳng IK (`pose_line`, `line_segment`), chọn nhánh IK và mô phỏng (`enable_self_collisions=False`) không kiểm tra gì (mục 1.2–1.3) | Hàm `self_clearance` (cầu va chạm của `ur5.yml`) để lọc nghiệm IK và đường thẳng, ngưỡng 2 mm | Mọi đoạn của V5full/V1new/V2new/V6: khoảng hở ≥ 4,1 mm (giá trị cấu trúc) |
+| **A. Cánh tay tự va chạm** (V1, V2; V4 chỉ "không va chạm" nhờ nghiệm phù hợp) | cuRobo **có** kiểm tra tự va chạm (cầu của `ur5.yml`, ràng buộc nhị phân) nhưng chỉ cho các đoạn nó tối ưu; các đoạn thẳng IK (`pose_line`, `line_segment`), chọn nhánh IK và mô phỏng (`enable_self_collisions=False`) không kiểm tra gì (mục 1.2–1.3, bằng chứng ở 1.1) | Hàm `self_clearance` (cầu va chạm của `ur5.yml`) để lọc nghiệm IK và đường thẳng, ngưỡng 2 mm | Mọi đoạn của V5full/V1new/V2new/V6: khoảng hở ≥ 4,1 mm (giá trị cấu trúc) |
 | **B. Má kẹp lệch khi gắp dây** (V1, V4) | Cơ cấu bốn thanh **của một ngón bị gập** khi lò xo `spring_link` quá yếu (k ≤ 0,125 N·m/rad) và má chỉ chạm dây ở 1 điểm | Chế độ kẹp theo spec 2.1.8: gắp dây dùng **Parallel (k = 0,2)**, gắp phích **Encompassing (k = 0,05)** | V6: lệch má **0,01–0,02 mm** (V4: ≈ 5 mm), điểm kẹp dây giữ như V4 (không nâng 7 mm như V5full) |
 
 Kết quả V6 đầy đủ (một lần chạy, 972 s thực / 72,2 s mô phỏng): cắm phích lệch trục 0,111 mm (giới hạn 0,2 mm), nghiêng 0,414°; dây không rơi; phích sau khi đặt dây dịch 0,620 mm so với vị trí cắm.
@@ -17,80 +17,201 @@ Kết quả V6 đầy đủ (một lần chạy, 972 s thực / 72,2 s mô phỏ
 - Lực kẹp mỗi ngón F dùng để chọn chế độ là **ước tính** từ mô-men giới hạn (mục 4.2), không phải đo trực tiếp.
 - Giá trị m = 2,5, S = 2,5, k = 0,2 và k = 0,05 trong spec 2.1.8 do người dùng đặt; tôi chỉ kiểm chứng chúng hoạt động.
 
-## 1. Ngày 11/11 – chống tự va chạm (V5full, V1new, V2new)
+## 1. Ngày 11/11 – chống tự va chạm của cánh tay (V5full, V1new, V2new, V6)
 
-### 1.1 Hiện tượng
-Ở V1 cánh tay đâm xuyên chính nó (video V1); ở V4 không thấy. Trong mô phỏng `enable_self_collisions=False` nên vật lý không báo gì, chỉ thấy khi xem video.
+Thuật ngữ: **khớp** (joint) là trục quay; **khâu** (link) là đoạn cứng giữa hai khớp. UR5 có 6 khớp và 6 khâu va chạm (shoulder, upper_arm, forearm, wrist_1, wrist_2, wrist_3). cuRobo và tôi đều kiểm tra va chạm giữa các **khâu**, không phải giữa các khớp.
 
-### 1.2 cuRobo có kiểm tra tự va chạm không? Có — và kiểm tra như sau
-**Có.** Tôi đọc cấu hình cuRobo cài trong môi trường (`curobo/content/configs/task/`), không suy đoán:
-- `MotionPlannerCfg.create(...)` có tham số `self_collision_check` mặc định **True**.
-- `metrics_base.yml` khai báo ràng buộc `self_collision_cfg` với `weight: 5000.0` và `convert_to_binary: True`; cùng khối `self_collision_cfg` có mặt trong cấu hình bộ giải IK (`ik/lbfgs_ik.yml`, `ik/particle_ik.yml`) và bộ tối ưu quỹ đạo (`trajopt/lbfgs_bspline_trajopt.yml`, `trajopt/particle_trajopt.yml`).
+### 1.1 Hiện tượng (kèm bằng chứng)
+**Quan sát ban đầu:** xem video V1 thấy cánh tay đâm xuyên chính nó khi vẫy dây; V4 thì không thấy. Trong mô phỏng `enable_self_collisions=False` nên vật lý không báo gì, chỉ nhìn thấy trên video.
 
-Cách kiểm tra (mô hình cầu, không dùng lưới):
-1. Mỗi khâu của robot được xấp xỉ bằng vài quả cầu; tọa độ và bán kính cầu nằm trong `data/assets/ur5/ur5.yml` (`collision_spheres`).
-2. Với một cấu hình khớp q, cuRobo tính vị trí mọi cầu bằng động học thuận, rồi tính độ xuyên giữa các cặp cầu thuộc **hai khâu khác nhau**, trừ các cặp bị loại trong `self_collision_ignore` (các khâu kề nhau, vì cầu ở khớp luôn chồng lên nhau) và cộng thêm `self_collision_buffer` (ở đây bằng 0 cho cả 6 khâu).
-3. Kết quả đi vào hàm chi phí/ràng buộc nhị phân ("có xuyên hay không") với trọng số 5000. Bộ tối ưu quỹ đạo (trajopt) và bộ giải IK nội bộ dùng ràng buộc này tại **từng điểm của quỹ đạo đang tối ưu**; quỹ đạo vi phạm thì bị loại và cuRobo thử lại (`max_attempts=40`) hoặc báo thất bại.
+**Đo lại bằng số** (`self_clearance` của tôi, trên kế hoạch V1 gốc `ur5_regrasp_V1_plan_regrasp.npz`, mỗi đoạn là một chuỗi cấu hình khớp):
 
-Vậy bộ kiểm tra của cuRobo hoạt động **với các đoạn do chính cuRobo tối ưu** (`plan_pose`, `plan_cspace`).
+| Đoạn V1 | Số điểm | Số điểm xuyên | Khoảng hở nhỏ nhất | Cặp khâu xuyên | Cấu hình xấu nhất q [độ] |
+|---|---|---|---|---|---|
+| wave1 | 140 | 105 | **−64,1 mm** | forearm – wrist_3 | [26, −38, 34, 122, **−226**, −53] |
+| wave2 | 80 | 80 | **−64,1 mm** | forearm – wrist_3 | cùng cấu hình trên (điểm đầu của wave2) |
+| wave3 | 140 | 7 | **−10,3 mm** | forearm – wrist_3 | [−14, −59, 60, 73, **−222**, −111] |
+| các đoạn còn lại | — | 0 | 4,1 mm | — | — |
 
-### 1.3 Vậy vì sao V1 vẫn tự va chạm?
-Không phải vì cuRobo kiểm tra sai. Tôi đã kiểm chứng trực tiếp (script `data/scripts/check_curobo_self_collision_V1.py`, chạy với `PYTHONPATH=~/.cache/cable_task/np2` như planner vì cuRobo cần numpy 2): nạp kế hoạch V1 gốc (`ur5_regrasp_V1_plan_regrasp.npz`) rồi cho **chính bộ kiểm tra của cuRobo** (`RobotCollisionChecker.get_scene_self_collision_distance_from_joints`, cùng `ur5.yml`) và hàm `self_clearance` của tôi chấm cùng các điểm:
+Ba điều đọc được từ bảng:
+- Cả 192 điểm xuyên đều thuộc **một cặp duy nhất: forearm (cẳng tay) và wrist_3 (đầu cổ tay + tay kẹp)**.
+- Cả hai cấu hình xấu nhất có khớp wrist_2 ở khoảng **−226° và −222°**, tức là vượt quá nửa vòng (±180°). Tôi chưa chứng minh mối liên hệ nhân quả giữa góc này và va chạm; đây chỉ là đặc điểm chung của hai cấu hình xấu nhất.
+- Cấu hình xấu nhất của wave1 là điểm **cuối** của nó và cũng là điểm **đầu** của wave2 (toàn bộ 80 điểm của wave2 đều xuyên); cấu hình xấu nhất của wave3 là điểm đầu của wave3. Tức là cánh tay đi vào một tư thế xuyên và giữ trạng thái đó qua cả đoạn.
 
-| Đoạn V1 | Số điểm | Điểm cuRobo báo va chạm | Điểm hàm của tôi báo < 0 | Khoảng hở nhỏ nhất của tôi |
-|---|---|---|---|---|
-| approach | 121 | 0 | 0 | 4,1 mm |
-| wave1 | 140 | **108** | 105 | **−64,1 mm** |
-| wave2 | 80 | **80** | 80 | −64,1 mm |
-| wave3 | 140 | **10** | 7 | −10,3 mm |
+V2 gốc cũng có hiện tượng tương tự ở bước nhặt dây: nhánh khớp đế 294° và đoạn hạ thẳng xuống dây có khoảng hở **−19,4 mm** (đo cùng cách).
 
-(Con số "độ xuyên" của hai bên không so sánh được vì thang đo khác nhau; chỉ số điểm bị báo là so sánh được.) Hai bộ kiểm tra **đồng ý** nhau. Các đoạn va chạm của V1 là wave1, wave2, wave3.
+### 1.2 cuRobo kiểm tra những khâu nào, bỏ qua những khâu nào, và vì sao
+**cuRobo có kiểm tra tự va chạm.** Cấu hình cuRobo cài trong môi trường: `MotionPlannerCfg.create(..., self_collision_check=True)` (mặc định), ràng buộc `self_collision_cfg` với `weight: 5000.0` và `convert_to_binary: True` trong `metrics_base.yml`, và khối `self_collision_cfg` có mặt ở cả bộ giải IK (`ik/lbfgs_ik.yml`) lẫn bộ tối ưu quỹ đạo (`trajopt/lbfgs_bspline_trajopt.yml`).
 
-Nguồn gốc các đoạn đó, đọc từ `ur5_regrasp_curobo_V1.py`: trong V1, mỗi chặng wave được tạo theo thứ tự thử `pose_line` (nội suy đường thẳng TCP, giải IK nối tiếp từng điểm), `line_segment` (đoạn thẳng IK), hoặc đảo ngược một đoạn trước đó; **chỉ khi các cách đó thất bại mới gọi `plan_cspace` của cuRobo**. Các đoạn do cuRobo tối ưu có số điểm dạng 20k + 1 (101, 121, 141, 161 trong log V1new), còn wave1 = 140, wave2 = 80, wave3 = 140 điểm không có dạng đó, nên chúng không phải đầu ra của trajopt (đây là suy luận từ số điểm và từ cấu trúc code, tôi không chạy lại V1 để xác nhận từng đoạn).
+**Mô hình va chạm** là các quả cầu gắn vào từng khâu (`data/assets/ur5/ur5.yml`, mục `collision_spheres`): shoulder 2 cầu, upper_arm 5, forearm 5, wrist_1 2, wrist_2 2, wrist_3 10 (các cầu của wrist_3 đại diện cho cả tay kẹp Robotiq). Với 6 khâu có C(6,2) = 15 cặp khâu. cuRobo chia 15 cặp thành hai nhóm bằng bảng `self_collision_ignore`:
 
-`pose_line`/`line_segment`/`joint_line` của V1 chỉ kiểm tra: sai số IK, bước nhảy khớp và khoảng hở **tới cột/tường/sàn**. Không có phép kiểm tra tự va chạm nào. Tương tự, chọn nhánh IK (`ik_near`, `ik_candidates`) bằng IK số học của tôi (`G.ik`) không kiểm tra gì về tự va chạm. Tức là:
+**Nhóm bỏ qua – 6 cặp** (không bao giờ kiểm tra):
+
+| Cặp khâu | Khoảng hở giữa các cầu: tại Home | trên 300 cấu hình ngẫu nhiên trong giới hạn khớp (nhỏ nhất … lớn nhất) |
+|---|---|---|
+| shoulder – upper_arm | −107,2 mm | −107,2 … −107,1 |
+| upper_arm – forearm | −43,3 mm | −43,3 … −43,3 |
+| forearm – wrist_1 | −55,7 mm | −55,8 … −55,7 |
+| wrist_1 – wrist_2 | −48,0 mm | −48,0 … −48,0 |
+| wrist_2 – wrist_3 | −60,7 mm | −60,7 … −60,7 |
+| wrist_1 – wrist_3 | +17,9 mm | −4,9 … +31,1 |
+
+**Nhóm kiểm tra – 9 cặp:**
+
+| Cặp khâu | Tại Home | Nhỏ nhất trên 300 cấu hình ngẫu nhiên |
+|---|---|---|
+| shoulder – forearm | 315,3 mm | −23,6 |
+| shoulder – wrist_1 | 470,6 | −52,3 |
+| shoulder – wrist_2 | 476,7 | −59,8 |
+| shoulder – wrist_3 | 442,4 | −63,0 |
+| upper_arm – wrist_1 | 287,3 | −50,7 |
+| upper_arm – wrist_2 | 288,5 | −72,3 |
+| upper_arm – wrist_3 | 378,3 | −85,0 |
+| forearm – wrist_2 | **4,1** (cũng là giá trị lớn nhất trong 300 mẫu) | −5,0 |
+| forearm – wrist_3 | 73,6 | −86,6 |
+
+**Vì sao bỏ qua 6 cặp đầu?** Bằng chứng ở bảng thứ nhất: hai khâu liền kề nối với nhau bằng một khớp, và các quả cầu xấp xỉ của chúng **chồng lên nhau ở chính khớp đó, ở mọi cấu hình** (xuyên 43–107 mm, gần như không đổi theo cấu hình; tôi suy ra là do các cầu của hai khâu liền kề nằm gần trục khớp chung nên quay theo trục đó, chưa kiểm tra riêng). Nếu kiểm tra những cặp này thì **mọi** cấu hình, kể cả Home, đều bị báo "va chạm" và cuRobo không thể tìm được quỹ đạo nào. Theo thiết kế của cuRobo, đây là sai số của phép xấp xỉ bằng cầu chứ không phải va chạm thật, vì hai khâu liền kề được nối trực tiếp bằng khớp (tôi không kiểm tra điều này bằng lưới). wrist_1–wrist_3 không liền kề trực tiếp nhưng cầu của chúng sát nhau quanh cổ tay (đôi khi chồng nhau, nhỏ nhất −4,9 mm), nên cũng bị bỏ qua cùng các khâu cổ tay.
+
+**9 cặp còn lại** là các khâu xa nhau trên chuỗi; cầu của chúng không chồng ở trạng thái bình thường (Home: 4,1 mm đến 477 mm) nhưng **có thể xuyên nhau khi cánh tay gập** (cột cuối: −5 đến −87 mm). Cặp **forearm–wrist_2 cách 4,1 mm ở Home và không lớn hơn 4,1 mm ở bất kỳ cấu hình nào trong 300 mẫu ngẫu nhiên (cũng như 1782 cấu hình của V4)**, nên nó là cặp sát nhất và 4,1 mm là giá trị cấu trúc của UR5.
+
+Nhận xét quan trọng: cặp xuyên của V1 là **forearm–wrist_3**, một trong 9 cặp **được** kiểm tra. Nên không thể giải thích lỗi V1 bằng việc cuRobo "bỏ qua khớp liền kề".
+
+### 1.3 Nguyên nhân
+Vì cặp forearm–wrist_3 nằm trong nhóm được cuRobo kiểm tra, vấn đề không phải là cuRobo kiểm tra sai mà là **các đoạn bị xuyên không đi qua bộ kiểm tra của cuRobo**.
+
+**Kiểm chứng 1 – cuRobo chấm kế hoạch V1 cũng báo va chạm.** Tôi cho chính bộ kiểm tra của cuRobo (`RobotCollisionChecker.get_scene_self_collision_distance_from_joints`, cùng `ur5.yml`) chấm các điểm của kế hoạch V1 (script `data/scripts/check_curobo_self_collision_V1.py`, chạy với `PYTHONPATH=~/.cache/cable_task/np2` vì cuRobo cần numpy 2):
+
+| Đoạn V1 | Số điểm | Điểm cuRobo báo va chạm | Điểm hàm của tôi báo < 0 |
+|---|---|---|---|
+| approach | 121 | 0 | 0 |
+| wave1 | 140 | 108 | 105 |
+| wave2 | 80 | 80 | 80 |
+| wave3 | 140 | 10 | 7 |
+
+(Số "độ xuyên" của hai bên có thang đo khác nhau nên không so sánh trực tiếp; chỉ số điểm bị báo là so sánh được.) Hai bộ kiểm tra đồng ý nhau: **bộ kiểm tra không sai, nhưng kế hoạch cuối cùng vẫn chứa các điểm bị nó báo là va chạm**.
+
+**Kiểm chứng 2 – các đoạn đó không do cuRobo tối ưu.** Trong `ur5_regrasp_curobo_V1.py`, mỗi chặng wave được tạo theo thứ tự: `pose_line` (nội suy đường thẳng TCP, giải IK nối tiếp từng điểm), `line_segment` (đoạn thẳng IK), hoặc đảo ngược một đoạn trước đó; chỉ khi các cách đó thất bại mới gọi `plan_cspace` của cuRobo. Các đoạn do cuRobo tối ưu có số điểm dạng 20k + 1 (101, 121, 141, 161 trong log V1new), còn wave1 = 140, wave2 = 80, wave3 = 140 điểm thì không. Đây là **suy luận từ số điểm và cấu trúc code**; tôi chưa chạy lại V1 để xác nhận từng đoạn.
+
+`pose_line`, `line_segment`, `joint_line` và việc chọn nhánh IK (`ik_near`, `ik_candidates`, dùng IK số học `G.ik` của tôi) trong V1 chỉ kiểm tra sai số IK, bước nhảy khớp và khoảng hở tới cột/tường/sàn, **không kiểm tra tự va chạm**. Tóm lại:
 
 | Thành phần | Kiểm tra tự va chạm? |
 |---|---|
-| `plan_pose`, `plan_cspace` (cuRobo) | **Có** (ràng buộc nhị phân, cầu của `ur5.yml`) |
-| `pose_line`, `line_segment`, `joint_line` (IK nối tiếp / nội suy khớp, mã của tôi) | **Không** (V1, V4) |
+| `plan_pose`, `plan_cspace` (cuRobo trajopt và IK nội bộ) | **Có** (ràng buộc nhị phân, cầu `ur5.yml`) |
+| `pose_line`, `line_segment`, `joint_line` (mã của tôi) | **Không** (V1, V4) |
 | `ik_near`, `ik_candidates` (chọn nhánh IK, mã của tôi) | **Không** (V1, V4) |
 | Mô phỏng Newton/MuJoCo | Không (`enable_self_collisions=False`) |
 
-Còn V4: tôi từng nói "V4 không va chạm có thể do may". Đã đo lại: trên 1782 cấu hình lấy từ các kế hoạch V4, khoảng hở nhỏ nhất là 4,1 mm (cặp forearm–wrist_2, đúng bằng giá trị ở tư thế Home). V4 không va chạm thật, nhưng **không có cơ chế nào bảo đảm điều đó** nên chỉ cần đổi nhánh IK là có thể va chạm như V1.
+**V4 không va chạm là gì?** Tôi từng nói "V4 không va chạm có thể do may". Đã đo lại trên 1782 cấu hình lấy từ các kế hoạch V4: khoảng hở nhỏ nhất 4,1 mm (cặp forearm–wrist_2). V4 không va chạm thật, nhưng **không có cơ chế nào bảo đảm điều đó**; các nhánh IK của V4 vô tình không rơi vào vùng xuyên, nên đổi nhánh IK có thể gây xuyên như V1.
 
-### 1.3b Giải pháp: tự va chạm cho các đoạn không do cuRobo tối ưu
-Đặt cùng một phép đo như cuRobo ở các chỗ cuRobo không phủ tới. Với mỗi cặp khâu (a, b) trong `SELF_PAIRS` (9 cặp; 6 cặp kề nhau trong `SELF_IGNORE_PAIRS` bị bỏ qua, sao chép từ `ur5_build_assets_V4.py` để hai bên dùng cùng quy tắc), khoảng hở giữa các cầu là:
+### 1.4 Giải pháp
+Đặt đúng phép đo của cuRobo (cùng cầu, cùng bảng bỏ qua) vào **các chỗ cuRobo không phủ tới**, rồi loại mọi nghiệm/đoạn vi phạm.
+
+**Phương trình.** Với cấu hình khớp q, cầu thứ i của khâu a có tâm c_i(q) (hệ thế giới, tính bằng động học thuận `link_frames(q)`) và bán kính r_i. Khoảng hở giữa hai khâu a, b và khoảng hở toàn cánh tay:
 
 $$ d_{ab}(q) = \min_{i \in a,\ j \in b} \left( \|c_i(q) - c_j(q)\| - r_i - r_j \right) $$
 
-$$ d_{\min}(q) = \min_{(a,b) \in P} d_{ab}(q), \qquad P = \text{SELF\_PAIRS} $$
+$$ d_{\min}(q) = \min_{(a,b) \in P} d_{ab}(q) $$
+
+Chú thích ký hiệu:
+- `a, b`: hai khâu khác nhau; `i`, `j` chạy trên các cầu của a và b.
+- `c_i(q)`, `c_j(q)`: tâm hai cầu; `r_i`, `r_j`: bán kính; `||.||`: khoảng cách Euclid. Biểu thức trong ngoặc là khoảng hở giữa **hai mặt cầu**: dương = tách nhau, âm = xuyên nhau.
+- `P` = `SELF_PAIRS` = 9 cặp trong bảng "kiểm tra" ở mục 1.2 (6 cặp bỏ qua không có trong P, **sao chép từ `self_collision_ignore` của `ur5_build_assets_V4.py`** để hai bên dùng cùng quy tắc). Khi đang mang phích, P thêm 3 cặp: (shoulder, plug), (upper_arm, plug), (forearm, plug).
+
+Quy tắc chấp nhận (δ = `SELF_MARGIN` = 2 mm):
+
+$$ d_{\min}(q) \ge \delta \quad \text{(cấu hình)}, \qquad \min_k d_{\min}(q_k) \ge \delta \quad \text{(đường } q_1 \dots q_N \text{)} $$
 
 Dạng văn bản thuần:
 
 ```
-d_ab(q) = min_{i thuộc a, j thuộc b} ( |c_i(q) - c_j(q)| - r_i - r_j )
-d_min(q) = min_{(a,b) trong SELF_PAIRS} d_ab(q)
-chấp nhận cấu hình q   <=>  d_min(q) >= SELF_MARGIN = 2 mm
-chấp nhận đường {q_k}  <=>  min_k d_min(q_k) >= SELF_MARGIN
+d_ab(q)  = min_{i thuộc a, j thuộc b} ( |c_i(q) - c_j(q)| - r_i - r_j )
+d_min(q) = min_{(a,b) trong P} d_ab(q)
+chấp nhận cấu hình q   <=>  d_min(q) >= delta = 2 mm
+chấp nhận đường q_1..q_N <=>  min_k d_min(q_k) >= delta
 ```
 
-Trong đó c_i(q) là tâm cầu thứ i trong hệ thế giới (tính bằng `link_frames(q)`), r_i là bán kính, P là tập `SELF_PAIRS`. Ngưỡng 2 mm chọn vì giá trị cấu trúc nhỏ nhất của UR5 là 4,1 mm: 2 mm loại được tư thế gập thật mà không chặn tư thế bình thường.
+Vì sao δ = 2 mm: giá trị cấu trúc nhỏ nhất của UR5 là 4,1 mm (forearm–wrist_2), nên δ = 2 mm loại được tư thế gập thật (−10 đến −68 mm) mà không chặn tư thế bình thường; δ lớn hơn 4,1 mm sẽ chặn cả tư thế Home.
 
-Chỗ gắn vào planner (`ur5_regrasp_curobo_V6.py`):
-- `ik_near` / `ik_candidates`: loại nghiệm có `self_clearance < SELF_MARGIN` (khi đang mang phích còn kiểm tra thêm cầu phích với shoulder/upper_arm/forearm).
-- `pose_line`, `joint_line`: trả về `None` nếu đường có `path_self_clearance < SELF_MARGIN`; khi `None` planner thử đoạn/nhánh khác.
-- Kiểm tra cuối cho **mọi đoạn**: in `self-collision clearance` và `raise RuntimeError` nếu < 0, nên kế hoạch không bao giờ im lặng cho qua một đoạn bị xuyên.
+**Code 1 – hàm đo (`ur5_regrasp_geom_V6.py`).** Cài đặt đúng hai công thức trên; `path_self_clearance` lấy nhỏ nhất trên cả đường.
+```python
+SELF_IGNORE_PAIRS = {frozenset(p) for p in [
+    ("shoulder_link", "upper_arm_link"), ("upper_arm_link", "forearm_link"), ("forearm_link", "wrist_1_link"),
+    ("wrist_1_link", "wrist_2_link"), ("wrist_1_link", "wrist_3_link"), ("wrist_2_link", "wrist_3_link")]}
+# SELF_PAIRS: các cặp khâu được kiểm tra
+SELF_PAIRS = [(a, b) for i, a in enumerate(LINK_NAMES) for b in LINK_NAMES[i + 1:] if frozenset((a, b)) not in SELF_IGNORE_PAIRS]
+# SELF_MARGIN: khoảng hở tối thiểu yêu cầu giữa các cầu tự va chạm [m]. Trên các kế hoạch V4 đã chạy tốt, cặp forearm-wrist_2 chỉ
+# còn ~4 mm (cấu trúc UR5), nên 2 mm đủ để loại các tư thế gập thật mà không chặn tư thế bình thường.
+SELF_MARGIN = 0.002
 
-**Kiểm chứng ca âm tính**: tư thế gập `[0, −0,1, −3,1, −1,5, 0, 0]` cho −68 mm, `[0, −2,9, −3,0, 0, 0, 0]` cho −40 mm: hàm bắt được va chạm thật.
 
-### 1.4 Kết quả
-| Bản | Kết quả |
-|---|---|
-| V5full (từ V4full) | mọi đoạn 4,1 mm |
-| V1new (từ V1) | wave1, wave2, wave3 trước đây −64,1 / −64,1 / −10,3 mm → 4,1 mm; **dây tuột ở gap23_in** (chưa rõ do V1 gốc hay do nhánh IK mới) |
-| V2new (từ V2) | cuRobo trả nhánh khớp đế 294° và đoạn hạ thẳng xuống dây có khoảng hở −19,4 mm (đúng hiện tượng "V2 va chạm khi nhặt dây"); mọi nhánh không va chạm đều là nhánh không quay; đoạn đặt dây `lay` chạm cột (−10,5 mm) nên V2new chỉ chạy **đến lúc nhặt dây** |
-| V6 | 4,1 mm ở mọi đoạn |
+# self_clearance: khoảng hở nhỏ nhất [m] giữa các cặp khâu không kề nhau (âm = các cầu xuyên vào nhau). carrying=True thêm cầu
+# phích (gắn ở cổ tay) so với các khâu cánh tay không phải cổ tay (upper_arm/forearm/shoulder)
+def self_clearance(q: np.ndarray, carrying: bool = False, detail: bool = False):
+    """Minimum distance [m] between the collision spheres of non-adjacent arm links (negative = penetration). With
+    ``carrying`` the plug spheres are also checked against the shoulder / upper arm / forearm. ``detail=True`` returns
+    (clearance, (link_a, link_b))."""
+    # world[n] = (N x 3 tâm cầu, N bán kính) của khâu n trong hệ thế giới
+    world = {}
+    frames = link_frames(q)
+    for name, (r, p) in zip(LINK_NAMES, frames, strict=True):
+        c = np.array([s[0] for s in LINK_SPHERES[name]], float)
+        world[name] = (p + c @ r.T, np.array([s[1] for s in LINK_SPHERES[name]], float))
+    if carrying:
+        p_tcp, r_w = fk(q)
+        ryaw = rot_z(hand_yaw(r_w))
+        ps = plug_spheres()
+        world["plug"] = (np.array([p_tcp - ryaw @ TCP_IN_PLUG + ryaw @ c for c, _ in ps]), np.array([rad for _, rad in ps]))
+    pairs = list(SELF_PAIRS) + ([("shoulder_link", "plug"), ("upper_arm_link", "plug"), ("forearm_link", "plug")] if carrying else [])
+    best, who = 1e9, None
+    for a, b in pairs:
+        ca, ra = world[a]
+        cb, rb = world[b]
+        d = np.linalg.norm(ca[:, None, :] - cb[None, :, :], axis=2) - ra[:, None] - rb[None, :]
+        m = float(d.min())
+        if m < best:
+            best, who = m, (a, b)
+    return (best, who) if detail else best
+
+
+# path_self_clearance: khoảng hở tự va chạm nhỏ nhất trên cả một đường khớp (N x 6)
+def path_self_clearance(qs, carrying: bool = False) -> float:
+    """Minimum self_clearance over a joint path."""
+    return min(self_clearance(q, carrying) for q in np.asarray(qs))
+```
+
+**Code 2 – lọc nghiệm IK (`ur5_regrasp_curobo_V6.py`, trong `ik_near`; `ik_candidates` có điều kiện tương tự).** Mỗi nghiệm ứng viên chỉ được giữ nếu d_min ≥ δ.
+```python
+        # V5: loại nghiệm làm cánh tay tự va chạm (self_clearance < SELF_MARGIN)
+        if err < 1e-4 and d < best_d and np.all(q > G.UR_Q_LOWER + 0.05) and np.all(q < G.UR_Q_UPPER - 0.05) \
+                and G.self_clearance(q, carrying) >= G.SELF_MARGIN:
+            # Cập nhật nghiệm tốt nhất
+            best, best_d = q, d
+```
+
+**Code 3 – loại các đường thẳng IK / đường khớp bị xuyên (`ur5_regrasp_curobo_V6.py`, cuối `pose_line`; `joint_line` làm tương tự).** Đây là chỗ V1 không có kiểm tra. Khi hàm trả về `None`, planner thử đoạn hoặc nhánh khác.
+```python
+    # V5: không được tự va chạm ở bất kỳ điểm nào
+    if G.path_self_clearance(qs) < G.SELF_MARGIN:
+        return None
+```
+
+**Code 4 – chốt chặn cuối cho mọi đoạn.** Sau khi lập xong kế hoạch, planner in `self-collision clearance` của từng đoạn và `raise RuntimeError` nếu < 0, nên kế hoạch không bao giờ im lặng cho qua một đoạn bị xuyên.
+
+**Kiểm chứng ca âm tính** (hàm phải bắt được va chạm thật): tư thế gập `[0, −0,1, −3,1, −1,5, 0, 0]` cho −68 mm, `[0, −2,9, −3,0, 0, 0, 0]` cho −40 mm.
+
+### 1.5 Kết quả
+Khoảng hở nhỏ nhất mỗi đoạn (từ dòng `[check] ... self-collision clearance` trong log):
+
+| Bản | Trước | Sau |
+|---|---|---|
+| V1 → V1new | wave1 −64,1 mm, wave2 −64,1 mm, wave3 −10,3 mm | cả ba **4,1 mm** (nhánh IK khác: wrist_1 quay 171°, wrist_3 tới −291°) |
+| V2 → V2new | bước nhặt dây −19,4 mm (nhánh khớp đế 294°) | **4,1 mm** (cuRobo trả nhánh khớp đế ≈ 11°) |
+| V4 → V5full / V6 | 4,1 mm (không có cơ chế bảo đảm) | 4,1 mm ở mọi đoạn, **có cơ chế** (kế hoạch bị dừng nếu < 0) |
+
+Hệ quả cần lưu ý:
+- Ở V2, nhánh không va chạm duy nhất là nhánh không quay; "hết va chạm" và "hết quay thừa" là một thay đổi. Nhưng với nhánh đó đoạn đặt dây `lay` làm cánh tay **chạm cột (−10,5 mm)** ở cả 10 nghiệm IK gần nhất, nên V2new chỉ chạy đến lúc nhặt dây xong.
+- V1new chạy hết nhưng **dây tuột ở gap23_in** (khoảng cách dây–TCP 5,3 → 7,4 → 7,1 → 9,6 mm rồi mất). Chưa biết đây là lỗi có sẵn của V1 hay do nhánh IK mới (cần chạy V1 gốc để so).
+- Khoảng hở 4,1 mm là giá trị cấu trúc, không phải dư địa an toàn; δ = 2 mm là ngưỡng chọn thủ công.
 
 ## 2. Ngày 11–12/11 – điều tra má kẹp lệch khi gắp dây
 
@@ -262,7 +383,7 @@ Lực tiếp xúc đo được khi gắp dây ở k = 0,2: 39–43 N mỗi bên,
 | Khoảng hở tự va chạm | 4,1 mm | 4,1 mm |
 
 ## 5. Sai sót của tôi (để bạn biết khi đọc lại)
-- Nói V4 tránh tự va chạm "có thể do may" khi chưa đo → sai (mục 1.2).
+- Nói V4 tránh tự va chạm "có thể do may" khi chưa đo → sai (mục 1.3).
 - Nghi nhiều lần "đầu ngón chạm sàn" và "hai PD không đồng bộ" gây lệch → đều sai (mục 2.2).
 - Giả thuyết "vị trí dây trên miếng đệm quyết định" → bị T3/T4 bác bỏ (mục 2.3). Thí nghiệm T2 và T6 không hợp lệ vì đặt dây dưới sàn / ngoài tay kẹp.
 - Ngày 12/11 tôi để một tiến trình chờ nền dùng `pgrep -f` tự khớp với chính nó nên **không bao giờ kết thúc**, làm mất hơn một giờ chờ vô ích trước khi người dùng nhắc.
@@ -297,77 +418,11 @@ python ur5_regrasp_render_isaac_V6.py --stride 3    # video
 ```
 
 
-## 8. Code đã thêm để sửa hai lỗi (trích nguyên văn từ V6)
+## 8. Code sửa lỗi lệch má kẹp (trích nguyên văn từ V6; code tự va chạm nằm ở mục 1.4)
 
-Mọi đoạn dưới đây lấy trực tiếp từ file nguồn V6 (đường dẫn ghi ở đầu mỗi đoạn); đọc kèm chú thích tiếng Việt trong file.
+Các đoạn dưới đây lấy trực tiếp từ file nguồn V6 (đường dẫn ghi ở đầu mỗi đoạn); đọc kèm chú thích tiếng Việt trong file.
 
-### 8.1 Tự va chạm – đo khoảng hở giữa các cầu (`ur5_regrasp_geom_V6.py`)
-`self_clearance` cài đặt đúng công thức d_min(q) ở mục 1.3b: tính vị trí cầu từng khâu bằng `link_frames`, rồi lấy khoảng cách nhỏ nhất giữa các cặp cầu của hai khâu không kề nhau; `path_self_clearance` lấy nhỏ nhất trên cả đường khớp.
-```python
-SELF_IGNORE_PAIRS = {frozenset(p) for p in [
-    ("shoulder_link", "upper_arm_link"), ("upper_arm_link", "forearm_link"), ("forearm_link", "wrist_1_link"),
-    ("wrist_1_link", "wrist_2_link"), ("wrist_1_link", "wrist_3_link"), ("wrist_2_link", "wrist_3_link")]}
-# SELF_PAIRS: các cặp khâu được kiểm tra
-SELF_PAIRS = [(a, b) for i, a in enumerate(LINK_NAMES) for b in LINK_NAMES[i + 1:] if frozenset((a, b)) not in SELF_IGNORE_PAIRS]
-# SELF_MARGIN: khoảng hở tối thiểu yêu cầu giữa các cầu tự va chạm [m]. Trên các kế hoạch V4 đã chạy tốt, cặp forearm-wrist_2 chỉ
-# còn ~4 mm (cấu trúc UR5), nên 2 mm đủ để loại các tư thế gập thật mà không chặn tư thế bình thường.
-SELF_MARGIN = 0.002
-
-
-# self_clearance: khoảng hở nhỏ nhất [m] giữa các cặp khâu không kề nhau (âm = các cầu xuyên vào nhau). carrying=True thêm cầu
-# phích (gắn ở cổ tay) so với các khâu cánh tay không phải cổ tay (upper_arm/forearm/shoulder)
-def self_clearance(q: np.ndarray, carrying: bool = False, detail: bool = False):
-    """Minimum distance [m] between the collision spheres of non-adjacent arm links (negative = penetration). With
-    ``carrying`` the plug spheres are also checked against the shoulder / upper arm / forearm. ``detail=True`` returns
-    (clearance, (link_a, link_b))."""
-    # world[n] = (N x 3 tâm cầu, N bán kính) của khâu n trong hệ thế giới
-    world = {}
-    frames = link_frames(q)
-    for name, (r, p) in zip(LINK_NAMES, frames, strict=True):
-        c = np.array([s[0] for s in LINK_SPHERES[name]], float)
-        world[name] = (p + c @ r.T, np.array([s[1] for s in LINK_SPHERES[name]], float))
-    if carrying:
-        p_tcp, r_w = fk(q)
-        ryaw = rot_z(hand_yaw(r_w))
-        ps = plug_spheres()
-        world["plug"] = (np.array([p_tcp - ryaw @ TCP_IN_PLUG + ryaw @ c for c, _ in ps]), np.array([rad for _, rad in ps]))
-    pairs = list(SELF_PAIRS) + ([("shoulder_link", "plug"), ("upper_arm_link", "plug"), ("forearm_link", "plug")] if carrying else [])
-    best, who = 1e9, None
-    for a, b in pairs:
-        ca, ra = world[a]
-        cb, rb = world[b]
-        d = np.linalg.norm(ca[:, None, :] - cb[None, :, :], axis=2) - ra[:, None] - rb[None, :]
-        m = float(d.min())
-        if m < best:
-            best, who = m, (a, b)
-    return (best, who) if detail else best
-
-
-# path_self_clearance: khoảng hở tự va chạm nhỏ nhất trên cả một đường khớp (N x 6)
-def path_self_clearance(qs, carrying: bool = False) -> float:
-    """Minimum self_clearance over a joint path."""
-    return min(self_clearance(q, carrying) for q in np.asarray(qs))
-```
-
-### 8.2 Tự va chạm – dùng hàm đo để lọc nghiệm IK (`ur5_regrasp_curobo_V6.py`, trong `ik_near`)
-Mỗi nghiệm IK ứng viên chỉ được chấp nhận nếu khoảng hở tự va chạm ≥ `SELF_MARGIN` (2 mm). `ik_candidates` có điều kiện tương tự.
-```python
-        # V5: loại nghiệm làm cánh tay tự va chạm (self_clearance < SELF_MARGIN)
-        if err < 1e-4 and d < best_d and np.all(q > G.UR_Q_LOWER + 0.05) and np.all(q < G.UR_Q_UPPER - 0.05) \
-                and G.self_clearance(q, carrying) >= G.SELF_MARGIN:
-            # Cập nhật nghiệm tốt nhất
-            best, best_d = q, d
-```
-
-### 8.3 Tự va chạm – loại các đường thẳng IK / đường khớp có va chạm (`ur5_regrasp_curobo_V6.py`, cuối `pose_line`; `joint_line` làm tương tự)
-Đây chính là chỗ V1 không có kiểm tra: đường thẳng nội suy chỉ kiểm tra khoảng hở tới cột/tường/sàn. Khi hàm trả về `None`, planner tự thử nhánh khác hoặc đoạn khác.
-```python
-    # V5: không được tự va chạm ở bất kỳ điểm nào
-    if G.path_self_clearance(qs) < G.SELF_MARGIN:
-        return None
-```
-
-### 8.4 Lệch má – chọn chế độ kẹp theo spec 2.1.8 (`ur5_regrasp_V6.py`)
+### 8.1 Lệch má – chọn chế độ kẹp theo spec 2.1.8 (`ur5_regrasp_V6.py`)
 Hằng số và hàm `grasp_mode` cài đặt F_sw và quy tắc F < F_sw ở mục 4.1–4.2.
 ```python
 K_PARALLEL = 0.2
@@ -392,7 +447,7 @@ def grasp_mode(effort, a_acc):
     return mode, (K_PARALLEL if mode == "parallel" else K_ENCOMPASSING), f, f_sw
 ```
 
-### 8.5 Lệch má – đặt độ cứng ban đầu (chế độ phích) khi dựng mô hình (`ur5_regrasp_V6.py`, trong `Example.__init__`)
+### 8.2 Lệch má – đặt độ cứng ban đầu (chế độ phích) khi dựng mô hình (`ur5_regrasp_V6.py`, trong `Example.__init__`)
 ```python
         # ---- V6: chế độ kẹp ban đầu = chế độ kẹp PHÍCH (mục 2.1.8 spec.md) -> chọn độ cứng k của lò xo spring_link ----------------
         # grasp_mode() so sánh lực kẹp mỗi ngón F với ngưỡng F_sw và trả về (chế độ, k, F, F_sw)
@@ -416,7 +471,7 @@ def grasp_mode(effort, a_acc):
             stiff_attr.values[b.joint_qd_start[j_spring]] = float(mode_plug[1])
 ```
 
-### 8.6 Lệch má – đổi độ cứng lúc đang chạy (`ur5_regrasp_V6.py`)
+### 8.3 Lệch má – đổi độ cứng lúc đang chạy (`ur5_regrasp_V6.py`)
 `dof_passive_stiffness` là bảng độ cứng lò xo thụ động của Newton/MuJoCo; sau khi sửa bảng phải gọi `notify_model_changed(JOINT_DOF_PROPERTIES)` để bộ giải nạp lại `jnt_stiffness`.
 ```python
     # V6: đổi độ cứng lò xo spring_link khi chuyển chế độ kẹp (Parallel k = 0.2 / Encompassing k = 0.05) ngay trong lúc chạy
@@ -434,7 +489,7 @@ def grasp_mode(effort, a_acc):
         print(f"[Spring] spring_link stiffness -> {k} N*m/rad", flush=True)
 ```
 
-### 8.7 Lệch má – gọi chuyển chế độ ngay trước khi khép má vào dây (`ur5_regrasp_V6.py`, trong `regrasp_phase`)
+### 8.4 Lệch má – gọi chuyển chế độ ngay trước khi khép má vào dây (`ur5_regrasp_V6.py`, trong `regrasp_phase`)
 ```python
         # V6: chọn chế độ kẹp cho DÂY theo mục 2.1.8 (lực kẹp dây = F_PER_NM * cable_grip_effort so với F_sw)
         mode_cable = grasp_mode(float(a.cable_grip_effort), a.a_carry)
