@@ -6,7 +6,7 @@ Tài liệu này gộp công việc của bốn ngày 11, 12, 13, 14/11/2026. V�
 
 | Lỗi | Nguyên nhân | Giải pháp | Kết quả |
 |---|---|---|---|
-| **A. Cánh tay tự va chạm** (V1, V2; V4 chỉ "không va chạm" nhờ nghiệm phù hợp) | Chỉ cuRobo tránh tự va chạm ở các đoạn nó lập kế hoạch; các đoạn thẳng IK, chọn nhánh IK và mô phỏng (`enable_self_collisions=False`) không kiểm tra gì | Hàm `self_clearance` (cầu va chạm của `ur5.yml`) để lọc nghiệm IK và đường thẳng, ngưỡng 2 mm | Mọi đoạn của V5full/V1new/V2new/V6: khoảng hở ≥ 4,1 mm (giá trị cấu trúc) |
+| **A. Cánh tay tự va chạm** (V1, V2; V4 chỉ "không va chạm" nhờ nghiệm phù hợp) | cuRobo **có** kiểm tra tự va chạm (cầu của `ur5.yml`, ràng buộc nhị phân) nhưng chỉ cho các đoạn nó tối ưu; các đoạn thẳng IK (`pose_line`, `line_segment`), chọn nhánh IK và mô phỏng (`enable_self_collisions=False`) không kiểm tra gì (mục 1.2–1.3) | Hàm `self_clearance` (cầu va chạm của `ur5.yml`) để lọc nghiệm IK và đường thẳng, ngưỡng 2 mm | Mọi đoạn của V5full/V1new/V2new/V6: khoảng hở ≥ 4,1 mm (giá trị cấu trúc) |
 | **B. Má kẹp lệch khi gắp dây** (V1, V4) | Cơ cấu bốn thanh **của một ngón bị gập** khi lò xo `spring_link` quá yếu (k ≤ 0,125 N·m/rad) và má chỉ chạm dây ở 1 điểm | Chế độ kẹp theo spec 2.1.8: gắp dây dùng **Parallel (k = 0,2)**, gắp phích **Encompassing (k = 0,05)** | V6: lệch má **0,01–0,02 mm** (V4: ≈ 5 mm), điểm kẹp dây giữ như V4 (không nâng 7 mm như V5full) |
 
 Kết quả V6 đầy đủ (một lần chạy, 972 s thực / 72,2 s mô phỏng): cắm phích lệch trục 0,111 mm (giới hạn 0,2 mm), nghiêng 0,414°; dây không rơi; phích sau khi đặt dây dịch 0,620 mm so với vị trí cắm.
@@ -20,24 +20,67 @@ Kết quả V6 đầy đủ (một lần chạy, 972 s thực / 72,2 s mô phỏ
 ## 1. Ngày 11/11 – chống tự va chạm (V5full, V1new, V2new)
 
 ### 1.1 Hiện tượng
-Ở V1 cánh tay đâm xuyên chính nó; ở V4 không thấy. Trong mô phỏng `enable_self_collisions=False` nên vật lý không báo gì, chỉ thấy khi xem video.
+Ở V1 cánh tay đâm xuyên chính nó (video V1); ở V4 không thấy. Trong mô phỏng `enable_self_collisions=False` nên vật lý không báo gì, chỉ thấy khi xem video.
 
-### 1.2 Nguyên nhân
-Ở V4, tự va chạm chỉ được xử lý bởi **cuRobo** trên các đoạn nó lập kế hoạch (nó có chi phí tự va chạm dùng các cầu trong `ur5.yml`, `self_collision_buffer = 0`). Không có gì kiểm tra:
-- các đoạn thẳng IK nối tiếp (`line_segment`, `pose_line`, `joint_line`);
-- việc chọn nhánh IK (`ik_near`, `ik_candidates`) và IK nội bộ của cuRobo ở `plan_pose`;
-- mô phỏng vật lý.
+### 1.2 cuRobo có kiểm tra tự va chạm không? Có — và kiểm tra như sau
+**Có.** Tôi đọc cấu hình cuRobo cài trong môi trường (`curobo/content/configs/task/`), không suy đoán:
+- `MotionPlannerCfg.create(...)` có tham số `self_collision_check` mặc định **True**.
+- `metrics_base.yml` khai báo ràng buộc `self_collision_cfg` với `weight: 5000.0` và `convert_to_binary: True`; cùng khối `self_collision_cfg` có mặt trong cấu hình bộ giải IK (`ik/lbfgs_ik.yml`, `ik/particle_ik.yml`) và bộ tối ưu quỹ đạo (`trajopt/lbfgs_bspline_trajopt.yml`, `trajopt/particle_trajopt.yml`).
 
-Tôi từng nói "V4 không va chạm có thể do may". **Đã đo lại**: trên 1782 cấu hình lấy từ các kế hoạch V4, khoảng hở nhỏ nhất là 4,1 mm (cặp forearm–wrist_2, bằng giá trị ở tư thế Home), nên V4 không va chạm thật nhưng không có cơ chế bảo đảm.
+Cách kiểm tra (mô hình cầu, không dùng lưới):
+1. Mỗi khâu của robot được xấp xỉ bằng vài quả cầu; tọa độ và bán kính cầu nằm trong `data/assets/ur5/ur5.yml` (`collision_spheres`).
+2. Với một cấu hình khớp q, cuRobo tính vị trí mọi cầu bằng động học thuận, rồi tính độ xuyên giữa các cặp cầu thuộc **hai khâu khác nhau**, trừ các cặp bị loại trong `self_collision_ignore` (các khâu kề nhau, vì cầu ở khớp luôn chồng lên nhau) và cộng thêm `self_collision_buffer` (ở đây bằng 0 cho cả 6 khâu).
+3. Kết quả đi vào hàm chi phí/ràng buộc nhị phân ("có xuyên hay không") với trọng số 5000. Bộ tối ưu quỹ đạo (trajopt) và bộ giải IK nội bộ dùng ràng buộc này tại **từng điểm của quỹ đạo đang tối ưu**; quỹ đạo vi phạm thì bị loại và cuRobo thử lại (`max_attempts=40`) hoặc báo thất bại.
 
-### 1.3 Giải pháp (trong `ur5_regrasp_geom_V6.py` và `ur5_regrasp_curobo_V6.py`)
-Với mỗi cặp khâu (a, b) trong danh sách `SELF_PAIRS` (9 cặp; 6 cặp kề nhau trong `SELF_IGNORE_PAIRS` bị bỏ qua, sao chép từ `ur5_build_assets_V4.py` để cuRobo và bộ kiểm tra dùng cùng quy tắc), khoảng hở giữa các cầu va chạm:
+Vậy bộ kiểm tra của cuRobo hoạt động **với các đoạn do chính cuRobo tối ưu** (`plan_pose`, `plan_cspace`).
 
-$$ d_{ab}(q)=\min_{i\in a,\,j\in b}\Big(\lVert c_i(q)-c_j(q)\rVert-r_i-r_j\Big),\qquad d_{\min}(q)=\min_{(a,b)\in \text{SELF\_PAIRS}} d_{ab}(q) $$
+### 1.3 Vậy vì sao V1 vẫn tự va chạm?
+Không phải vì cuRobo kiểm tra sai. Tôi đã kiểm chứng trực tiếp (script `data/scripts/check_curobo_self_collision_V1.py`, chạy với `PYTHONPATH=~/.cache/cable_task/np2` như planner vì cuRobo cần numpy 2): nạp kế hoạch V1 gốc (`ur5_regrasp_V1_plan_regrasp.npz`) rồi cho **chính bộ kiểm tra của cuRobo** (`RobotCollisionChecker.get_scene_self_collision_distance_from_joints`, cùng `ur5.yml`) và hàm `self_clearance` của tôi chấm cùng các điểm:
 
-Một cấu hình được chấp nhận khi $d_{\min}(q)\ge \delta$ với $\delta=$ `SELF_MARGIN` = 2 mm (giá trị cấu trúc 4,1 mm nên 2 mm loại được tư thế gập thật mà không chặn tư thế bình thường). Một đường khớp $\{q_k\}$ được chấp nhận khi $\min_k d_{\min}(q_k)\ge\delta$ (`path_self_clearance`).
+| Đoạn V1 | Số điểm | Điểm cuRobo báo va chạm | Điểm hàm của tôi báo < 0 | Khoảng hở nhỏ nhất của tôi |
+|---|---|---|---|---|
+| approach | 121 | 0 | 0 | 4,1 mm |
+| wave1 | 140 | **108** | 105 | **−64,1 mm** |
+| wave2 | 80 | **80** | 80 | −64,1 mm |
+| wave3 | 140 | **10** | 7 | −10,3 mm |
 
-Chỗ gắn vào planner: `ik_near`/`ik_candidates` loại nghiệm không đạt; `pose_line`/`joint_line` trả `None` nếu đường vi phạm; kiểm tra cuối cho mọi đoạn in `self-collision clearance` và `raise RuntimeError` nếu < 0.
+(Con số "độ xuyên" của hai bên không so sánh được vì thang đo khác nhau; chỉ số điểm bị báo là so sánh được.) Hai bộ kiểm tra **đồng ý** nhau. Các đoạn va chạm của V1 là wave1, wave2, wave3.
+
+Nguồn gốc các đoạn đó, đọc từ `ur5_regrasp_curobo_V1.py`: trong V1, mỗi chặng wave được tạo theo thứ tự thử `pose_line` (nội suy đường thẳng TCP, giải IK nối tiếp từng điểm), `line_segment` (đoạn thẳng IK), hoặc đảo ngược một đoạn trước đó; **chỉ khi các cách đó thất bại mới gọi `plan_cspace` của cuRobo**. Các đoạn do cuRobo tối ưu có số điểm dạng 20k + 1 (101, 121, 141, 161 trong log V1new), còn wave1 = 140, wave2 = 80, wave3 = 140 điểm không có dạng đó, nên chúng không phải đầu ra của trajopt (đây là suy luận từ số điểm và từ cấu trúc code, tôi không chạy lại V1 để xác nhận từng đoạn).
+
+`pose_line`/`line_segment`/`joint_line` của V1 chỉ kiểm tra: sai số IK, bước nhảy khớp và khoảng hở **tới cột/tường/sàn**. Không có phép kiểm tra tự va chạm nào. Tương tự, chọn nhánh IK (`ik_near`, `ik_candidates`) bằng IK số học của tôi (`G.ik`) không kiểm tra gì về tự va chạm. Tức là:
+
+| Thành phần | Kiểm tra tự va chạm? |
+|---|---|
+| `plan_pose`, `plan_cspace` (cuRobo) | **Có** (ràng buộc nhị phân, cầu của `ur5.yml`) |
+| `pose_line`, `line_segment`, `joint_line` (IK nối tiếp / nội suy khớp, mã của tôi) | **Không** (V1, V4) |
+| `ik_near`, `ik_candidates` (chọn nhánh IK, mã của tôi) | **Không** (V1, V4) |
+| Mô phỏng Newton/MuJoCo | Không (`enable_self_collisions=False`) |
+
+Còn V4: tôi từng nói "V4 không va chạm có thể do may". Đã đo lại: trên 1782 cấu hình lấy từ các kế hoạch V4, khoảng hở nhỏ nhất là 4,1 mm (cặp forearm–wrist_2, đúng bằng giá trị ở tư thế Home). V4 không va chạm thật, nhưng **không có cơ chế nào bảo đảm điều đó** nên chỉ cần đổi nhánh IK là có thể va chạm như V1.
+
+### 1.3b Giải pháp: tự va chạm cho các đoạn không do cuRobo tối ưu
+Đặt cùng một phép đo như cuRobo ở các chỗ cuRobo không phủ tới. Với mỗi cặp khâu (a, b) trong `SELF_PAIRS` (9 cặp; 6 cặp kề nhau trong `SELF_IGNORE_PAIRS` bị bỏ qua, sao chép từ `ur5_build_assets_V4.py` để hai bên dùng cùng quy tắc), khoảng hở giữa các cầu là:
+
+$$ d_{ab}(q) = \min_{i \in a,\ j \in b} \left( \|c_i(q) - c_j(q)\| - r_i - r_j \right) $$
+
+$$ d_{\min}(q) = \min_{(a,b) \in P} d_{ab}(q), \qquad P = \text{SELF\_PAIRS} $$
+
+Dạng văn bản thuần:
+
+```
+d_ab(q) = min_{i thuộc a, j thuộc b} ( |c_i(q) - c_j(q)| - r_i - r_j )
+d_min(q) = min_{(a,b) trong SELF_PAIRS} d_ab(q)
+chấp nhận cấu hình q   <=>  d_min(q) >= SELF_MARGIN = 2 mm
+chấp nhận đường {q_k}  <=>  min_k d_min(q_k) >= SELF_MARGIN
+```
+
+Trong đó c_i(q) là tâm cầu thứ i trong hệ thế giới (tính bằng `link_frames(q)`), r_i là bán kính, P là tập `SELF_PAIRS`. Ngưỡng 2 mm chọn vì giá trị cấu trúc nhỏ nhất của UR5 là 4,1 mm: 2 mm loại được tư thế gập thật mà không chặn tư thế bình thường.
+
+Chỗ gắn vào planner (`ur5_regrasp_curobo_V6.py`):
+- `ik_near` / `ik_candidates`: loại nghiệm có `self_clearance < SELF_MARGIN` (khi đang mang phích còn kiểm tra thêm cầu phích với shoulder/upper_arm/forearm).
+- `pose_line`, `joint_line`: trả về `None` nếu đường có `path_self_clearance < SELF_MARGIN`; khi `None` planner thử đoạn/nhánh khác.
+- Kiểm tra cuối cho **mọi đoạn**: in `self-collision clearance` và `raise RuntimeError` nếu < 0, nên kế hoạch không bao giờ im lặng cho qua một đoạn bị xuyên.
 
 **Kiểm chứng ca âm tính**: tư thế gập `[0, −0,1, −3,1, −1,5, 0, 0]` cho −68 mm, `[0, −2,9, −3,0, 0, 0, 0]` cho −40 mm: hàm bắt được va chạm thật.
 
@@ -54,9 +97,16 @@ Chỗ gắn vào planner: `ik_near`/`ik_candidates` loại nghiệm không đạ
 ### 2.1 Hiện tượng (đã đo)
 Khi gắp dây, **góc hai driver bằng nhau** (chênh 0,0000 rad) nhưng hai miếng đệm không đối xứng quanh dây. Chỉ số lệch:
 
-$$ \mathbf{o}=R_{w}^{\top}\Big(\tfrac12(p_R+p_L)-p_w\Big)-\mathbf t_{\text{TCP}},\qquad \text{lệch má}=o_x $$
+$$ o = R_w^{T} \left( \frac{p_R + p_L}{2} - p_w \right) - t_{TCP}, \qquad \Delta_{jaw} = o_x $$
 
-($p_R, p_L$ = vị trí hai miếng đệm, $p_w$ và $R_w$ = vị trí và hướng wrist_3, $\mathbf t_{\text{TCP}}$ = offset TCP trong hệ wrist_3). Kẹp phích: $o_x=0{,}03$ mm. Kẹp dây ở V4: $o_x\approx 4{,}7$–$5{,}2$ mm (miếng đệm +36,7 / −27,4 mm); **bên lệch thay đổi giữa các lần chạy**.
+Dạng văn bản thuần:
+
+```
+o = R_w^T * ( (p_R + p_L)/2 - p_w ) - t_TCP        (vector 3 thành phần, hệ wrist_3)
+lech_ma = o_x                                       (thành phần theo hướng khép của hai má)
+```
+
+($p_R$, $p_L$ = vị trí hai miếng đệm; $p_w$, $R_w$ = vị trí và ma trận quay của wrist_3; $t_{TCP}$ = offset TCP trong hệ wrist_3). Kẹp phích: o_x = 0,03 mm. Kẹp dây ở V4: o_x ≈ 4,7–5,2 mm (miếng đệm +36,7 / −27,4 mm); **bên lệch thay đổi giữa các lần chạy**.
 
 ### 2.2 Các giả thuyết đã bị đo đạc bác bỏ
 | Giả thuyết | Thí nghiệm | Kết quả |
@@ -96,9 +146,13 @@ base ─┬─ driver ── coupler                         (nhánh dẫn, có 
 
 Khớp spring_link: dải [−0,297; 0,8] rad, `stiffness` = 0,05 N·m/rad, `springref` = 2,62 rad (nằm ngoài dải nên lò xo luôn đẩy spring_link về phía giới hạn trên). Mô-men lò xo:
 
-$$ \tau_s = k\,(q_{\text{ref}}-q_s),\quad q_{\text{ref}}=2{,}62\ \text{rad} $$
+$$ \tau_s = k \, (q_{ref} - q_s), \qquad q_{ref} = 2.62 \ \mathrm{rad} $$
 
-Tại $q_s=0{,}4$ rad: $k=0{,}05\Rightarrow \tau_s\approx0{,}11$ N·m; $k=0{,}2\Rightarrow \tau_s\approx0{,}44$ N·m (mô-men giới hạn driver 3,2 N·m). Follower có giới hạn ±0,872664 rad.
+```
+tau_s = k * (q_ref - q_s),   q_ref = 2.62 rad      (mo-men lo xo xoan cua spring_link, N*m)
+```
+
+Tại q_s = 0,4 rad: k = 0,05 cho tau_s = 0,05 × (2,62 − 0,4) ≈ 0,11 N·m; k = 0,2 cho tau_s ≈ 0,44 N·m (mô-men giới hạn driver 3,2 N·m). Follower có giới hạn ±0,872664 rad.
 
 ### 3.2 Giả thuyết và cách kiểm chứng
 Giả thuyết: khi một ngón chỉ chạm dây ở một điểm, lực lệch tâm sinh mô-men lên cơ cấu thụ động; lò xo k = 0,05 quá yếu để giữ nên spring_link rơi về ≈ 0 và follower quay đến giới hạn: ngón **gập sang cấu hình thứ hai**, miếng đệm lùi ra → lệch má. Kiểm chứng bằng cách ghi đè `dof_passive_stiffness` của hai khớp spring_link và chạy lại ca T4.
@@ -151,21 +205,35 @@ Nếu ngón chỉ "kẹt ở cữ chặn 0,873" thì nới giới hạn phải x
 ## 4. Ngày 14/11 – V6: chế độ kẹp theo spec.md mục 2.1.8
 
 ### 4.1 Công thức
-Mỗi ngón tạo một tiếp xúc ma sát, nên để vật khối lượng $m$ không trượt khi gia tốc $a$:
+Mỗi ngón tạo một tiếp xúc ma sát, nên để vật khối lượng m không trượt khi có gia tốc a thì phải có:
 
-$$ 2\mu F \ge m\,(g+a)\ \Rightarrow\ F_{sw}=\frac{m\,(g+a)}{2\mu}\,S $$
+$$ 2 \mu F \ge m (g + a) \quad \Rightarrow \quad F_{sw} = \frac{m (g + a)}{2 \mu} \, S $$
 
-Với $m=2{,}5$, $g=9{,}81$, $a=0{,}8$ m/s² (`--a-carry`), $\mu=0{,}7$ (`PAD_MU`, cao su/PVC), $S=2{,}5$:
+```
+2 * mu * F >= m * (g + a)        (hai tiep xuc ma sat, moi ngon mot tiep xuc)
+F_sw = m * (g + a) / (2 * mu) * S
+```
 
-$$ F_{sw}=\frac{2{,}5\,(9{,}81+0{,}8)}{2\cdot0{,}7}\cdot2{,}5=47{,}37\ \text{N} $$
+Với m = 2,5; g = 9,81; a = 0,8 m/s² (`--a-carry`); mu = 0,7 (`PAD_MU`, cao su/PVC); S = 2,5:
 
-- $F<F_{sw}$: **Parallel Grasp**, lò xo spring_link k = 0,2 N·m/rad.
-- $F\ge F_{sw}$: **Encompassing Grasp**, k = 0,05 N·m/rad.
+$$ F_{sw} = \frac{2.5 \times (9.81 + 0.8)}{2 \times 0.7} \times 2.5 = 47.37 \ \mathrm{N} $$
+
+```
+F_sw = 2.5 * (9.81 + 0.8) / (2 * 0.7) * 2.5 = 47.37 N
+```
+
+- F < F_sw: **Parallel Grasp**, lò xo spring_link k = 0,2 N·m/rad.
+- F ≥ F_sw: **Encompassing Grasp**, k = 0,05 N·m/rad.
 
 ### 4.2 Lực kẹp F mỗi ngón
 Không đo trực tiếp lúc quyết định; ước tính từ mô-men giới hạn driver, hiệu chuẩn bằng phép đo kẹp phích (56,4 N ở 3,2 N·m):
 
-$$ F = 17{,}6\ \text{N/(N·m)}\cdot\tau_{\max}\ \Rightarrow\ \text{phích: }56{,}4\ \text{N},\quad \text{dây (2,2 N·m): }38{,}8\ \text{N} $$
+$$ F = 17.6 \cdot \tau_{max} \qquad \Rightarrow \qquad F_{plug} = 56.4 \ \mathrm{N}, \quad F_{cable} = 38.8 \ \mathrm{N} $$
+
+```
+F = 17.6 [N/(N*m)] * tau_max          tau_max = mo-men gioi han cua driver
+phich: 17.6 * 3.2 = 56.4 N            day: 17.6 * 2.2 = 38.8 N
+```
 
 | Vật | F | F_sw | Chế độ | k |
 |---|---|---|---|---|
@@ -209,7 +277,8 @@ Lực tiếp xúc đo được khi gắp dây ở k = 0,2: 39–43 N mỗi bên,
 4. Ma sát μ trong F_sw lấy `PAD_MU = 0,7` cho cả phích và dây, trong khi proxy dây trong mô phỏng có μ = 1,2.
 5. Ngón gập còn xảy ra nếu đổi k hoặc lực kẹp; nên thử thêm giảm chấn cho spring_link như một cách khác để chặn gập mà ít ảnh hưởng đến kẹp phích (chưa thử).
 6. V1new: dây tuột ở gap23_in (chưa biết có sẵn ở V1 không). V2new: đoạn đặt dây chạm cột (−10,5 mm), chỉ chạy đến lúc nhặt dây.
-7. Mô phỏng vẫn tắt `enable_self_collisions`; an toàn tự va chạm dựa vào mô hình cầu, chưa so với lưới ở tư thế biên.
+7. Nguồn gốc các đoạn va chạm của V1 (đoạn wave1–wave3 không do cuRobo tối ưu) suy ra từ số điểm của đoạn và cấu trúc code V1, chưa chạy lại V1 để xác nhận từng đoạn.
+8. Mô phỏng vẫn tắt `enable_self_collisions`; an toàn tự va chạm dựa vào mô hình cầu, chưa so với lưới ở tư thế biên.
 
 ## 7. File và cách chạy lại
 | File (`data/scripts/`) | Nội dung |
@@ -225,4 +294,152 @@ Video: `data/results/video_ur5_regrasp_V6.mp4`. Log: `data/results/run_V6.log`.
 cd data/scripts
 python ur5_regrasp_V6.py --test                     # chuỗi đầy đủ V6 (~16 phút)
 python ur5_regrasp_render_isaac_V6.py --stride 3    # video
+```
+
+
+## 8. Code đã thêm để sửa hai lỗi (trích nguyên văn từ V6)
+
+Mọi đoạn dưới đây lấy trực tiếp từ file nguồn V6 (đường dẫn ghi ở đầu mỗi đoạn); đọc kèm chú thích tiếng Việt trong file.
+
+### 8.1 Tự va chạm – đo khoảng hở giữa các cầu (`ur5_regrasp_geom_V6.py`)
+`self_clearance` cài đặt đúng công thức d_min(q) ở mục 1.3b: tính vị trí cầu từng khâu bằng `link_frames`, rồi lấy khoảng cách nhỏ nhất giữa các cặp cầu của hai khâu không kề nhau; `path_self_clearance` lấy nhỏ nhất trên cả đường khớp.
+```python
+SELF_IGNORE_PAIRS = {frozenset(p) for p in [
+    ("shoulder_link", "upper_arm_link"), ("upper_arm_link", "forearm_link"), ("forearm_link", "wrist_1_link"),
+    ("wrist_1_link", "wrist_2_link"), ("wrist_1_link", "wrist_3_link"), ("wrist_2_link", "wrist_3_link")]}
+# SELF_PAIRS: các cặp khâu được kiểm tra
+SELF_PAIRS = [(a, b) for i, a in enumerate(LINK_NAMES) for b in LINK_NAMES[i + 1:] if frozenset((a, b)) not in SELF_IGNORE_PAIRS]
+# SELF_MARGIN: khoảng hở tối thiểu yêu cầu giữa các cầu tự va chạm [m]. Trên các kế hoạch V4 đã chạy tốt, cặp forearm-wrist_2 chỉ
+# còn ~4 mm (cấu trúc UR5), nên 2 mm đủ để loại các tư thế gập thật mà không chặn tư thế bình thường.
+SELF_MARGIN = 0.002
+
+
+# self_clearance: khoảng hở nhỏ nhất [m] giữa các cặp khâu không kề nhau (âm = các cầu xuyên vào nhau). carrying=True thêm cầu
+# phích (gắn ở cổ tay) so với các khâu cánh tay không phải cổ tay (upper_arm/forearm/shoulder)
+def self_clearance(q: np.ndarray, carrying: bool = False, detail: bool = False):
+    """Minimum distance [m] between the collision spheres of non-adjacent arm links (negative = penetration). With
+    ``carrying`` the plug spheres are also checked against the shoulder / upper arm / forearm. ``detail=True`` returns
+    (clearance, (link_a, link_b))."""
+    # world[n] = (N x 3 tâm cầu, N bán kính) của khâu n trong hệ thế giới
+    world = {}
+    frames = link_frames(q)
+    for name, (r, p) in zip(LINK_NAMES, frames, strict=True):
+        c = np.array([s[0] for s in LINK_SPHERES[name]], float)
+        world[name] = (p + c @ r.T, np.array([s[1] for s in LINK_SPHERES[name]], float))
+    if carrying:
+        p_tcp, r_w = fk(q)
+        ryaw = rot_z(hand_yaw(r_w))
+        ps = plug_spheres()
+        world["plug"] = (np.array([p_tcp - ryaw @ TCP_IN_PLUG + ryaw @ c for c, _ in ps]), np.array([rad for _, rad in ps]))
+    pairs = list(SELF_PAIRS) + ([("shoulder_link", "plug"), ("upper_arm_link", "plug"), ("forearm_link", "plug")] if carrying else [])
+    best, who = 1e9, None
+    for a, b in pairs:
+        ca, ra = world[a]
+        cb, rb = world[b]
+        d = np.linalg.norm(ca[:, None, :] - cb[None, :, :], axis=2) - ra[:, None] - rb[None, :]
+        m = float(d.min())
+        if m < best:
+            best, who = m, (a, b)
+    return (best, who) if detail else best
+
+
+# path_self_clearance: khoảng hở tự va chạm nhỏ nhất trên cả một đường khớp (N x 6)
+def path_self_clearance(qs, carrying: bool = False) -> float:
+    """Minimum self_clearance over a joint path."""
+    return min(self_clearance(q, carrying) for q in np.asarray(qs))
+```
+
+### 8.2 Tự va chạm – dùng hàm đo để lọc nghiệm IK (`ur5_regrasp_curobo_V6.py`, trong `ik_near`)
+Mỗi nghiệm IK ứng viên chỉ được chấp nhận nếu khoảng hở tự va chạm ≥ `SELF_MARGIN` (2 mm). `ik_candidates` có điều kiện tương tự.
+```python
+        # V5: loại nghiệm làm cánh tay tự va chạm (self_clearance < SELF_MARGIN)
+        if err < 1e-4 and d < best_d and np.all(q > G.UR_Q_LOWER + 0.05) and np.all(q < G.UR_Q_UPPER - 0.05) \
+                and G.self_clearance(q, carrying) >= G.SELF_MARGIN:
+            # Cập nhật nghiệm tốt nhất
+            best, best_d = q, d
+```
+
+### 8.3 Tự va chạm – loại các đường thẳng IK / đường khớp có va chạm (`ur5_regrasp_curobo_V6.py`, cuối `pose_line`; `joint_line` làm tương tự)
+Đây chính là chỗ V1 không có kiểm tra: đường thẳng nội suy chỉ kiểm tra khoảng hở tới cột/tường/sàn. Khi hàm trả về `None`, planner tự thử nhánh khác hoặc đoạn khác.
+```python
+    # V5: không được tự va chạm ở bất kỳ điểm nào
+    if G.path_self_clearance(qs) < G.SELF_MARGIN:
+        return None
+```
+
+### 8.4 Lệch má – chọn chế độ kẹp theo spec 2.1.8 (`ur5_regrasp_V6.py`)
+Hằng số và hàm `grasp_mode` cài đặt F_sw và quy tắc F < F_sw ở mục 4.1–4.2.
+```python
+K_PARALLEL = 0.2
+K_ENCOMPASSING = 0.05
+# GRASP_S: hệ số an toàn S của công thức F_sw (spec: 1 <= S <= 4)
+GRASP_S = 2.5
+# GRASP_MASS: khối lượng m trong công thức F_sw [kg] (spec: 2.5)
+GRASP_MASS = 2.5
+# F_PER_NM: lực pháp tuyến mỗi má / mô-men giới hạn của driver [N/(N·m)]; hiệu chuẩn từ phép đo kẹp phích: 56.4 N ở 3.2 N·m
+F_PER_NM = 56.4 / 3.2
+
+
+def grasp_mode(effort, a_acc):
+    """Trả về (chế độ, k, F, F_sw). effort = mô-men giới hạn của driver [N·m]; a_acc = gia tốc tối đa khi mang vật [m/s^2]."""
+    # Ngưỡng lực F_sw = m (g + a) / (2 mu) * S, với mu = hệ số ma sát miếng đệm PAD_MU
+    f_sw = GRASP_MASS * (9.81 + a_acc) / (2.0 * PAD_MU) * GRASP_S
+    # Lực kẹp mỗi ngón ước tính từ mô-men giới hạn (đã hiệu chuẩn bằng F_PER_NM)
+    f = F_PER_NM * effort
+    # F < F_sw -> Parallel, ngược lại Encompassing
+    mode = "parallel" if f < f_sw else "encompassing"
+    # Trả về chế độ, độ cứng tương ứng, F và F_sw
+    return mode, (K_PARALLEL if mode == "parallel" else K_ENCOMPASSING), f, f_sw
+```
+
+### 8.5 Lệch má – đặt độ cứng ban đầu (chế độ phích) khi dựng mô hình (`ur5_regrasp_V6.py`, trong `Example.__init__`)
+```python
+        # ---- V6: chế độ kẹp ban đầu = chế độ kẹp PHÍCH (mục 2.1.8 spec.md) -> chọn độ cứng k của lò xo spring_link ----------------
+        # grasp_mode() so sánh lực kẹp mỗi ngón F với ngưỡng F_sw và trả về (chế độ, k, F, F_sw)
+        mode_plug = grasp_mode(float(self.args.grip_effort), self.args.a_carry)
+        # In chế độ được chọn để đối chiếu với spec
+        print(f"[Mode] plug: F={mode_plug[2]:.1f} N per finger, F_sw={mode_plug[3]:.2f} N -> {mode_plug[0]} (k={mode_plug[1]})", flush=True)
+        # Thuộc tính tùy biến của MuJoCo chứa độ cứng lò xo thụ động của từng bậc tự do (đơn vị N·m/rad với khớp xoay)
+        stiff_attr = b.custom_attributes["mujoco:dof_passive_stiffness"]
+        # Nếu bảng giá trị chưa tồn tại thì tạo bảng rỗng
+        if stiff_attr.values is None:
+            stiff_attr.values = {}
+        # spring_dofs = chỉ số bậc tự do của khớp spring_link bên phải và bên trái (để đổi độ cứng lúc chạy, xem set_spring_k)
+        self.spring_dofs = []
+        # Với từng bên:
+        for side in ("right", "left"):
+            # Tìm khớp spring_link của bên đó
+            j_spring = _find_label_index(b.joint_label, f"/{side}_spring_link_joint")
+            # Ghi nhớ chỉ số bậc tự do của khớp
+            self.spring_dofs.append(b.joint_qd_start[j_spring])
+            # Đặt độ cứng ban đầu theo chế độ kẹp phích
+            stiff_attr.values[b.joint_qd_start[j_spring]] = float(mode_plug[1])
+```
+
+### 8.6 Lệch má – đổi độ cứng lúc đang chạy (`ur5_regrasp_V6.py`)
+`dof_passive_stiffness` là bảng độ cứng lò xo thụ động của Newton/MuJoCo; sau khi sửa bảng phải gọi `notify_model_changed(JOINT_DOF_PROPERTIES)` để bộ giải nạp lại `jnt_stiffness`.
+```python
+    # V6: đổi độ cứng lò xo spring_link khi chuyển chế độ kẹp (Parallel k = 0.2 / Encompassing k = 0.05) ngay trong lúc chạy
+    def set_spring_k(self, k):
+        # Đọc bảng độ cứng lò xo thụ động của mọi bậc tự do (mảng warp -> numpy)
+        arr = self.model_a.mujoco.dof_passive_stiffness.numpy()
+        # Chỉ ghi đè hai bậc tự do spring_link (phải, trái)
+        for d in self.spring_dofs:
+            arr[d] = k
+        # Ghi bảng mới về model
+        self.model_a.mujoco.dof_passive_stiffness.assign(arr)
+        # Báo bộ giải MuJoCo cập nhật thuộc tính khớp (jnt_stiffness)
+        self.solver_a.notify_model_changed(newton.ModelFlags.JOINT_DOF_PROPERTIES)
+        # In giá trị mới để kiểm tra trong log
+        print(f"[Spring] spring_link stiffness -> {k} N*m/rad", flush=True)
+```
+
+### 8.7 Lệch má – gọi chuyển chế độ ngay trước khi khép má vào dây (`ur5_regrasp_V6.py`, trong `regrasp_phase`)
+```python
+        # V6: chọn chế độ kẹp cho DÂY theo mục 2.1.8 (lực kẹp dây = F_PER_NM * cable_grip_effort so với F_sw)
+        mode_cable = grasp_mode(float(a.cable_grip_effort), a.a_carry)
+        # In chế độ được chọn
+        print(f"[Mode] cable: F={mode_cable[2]:.1f} N per finger, F_sw={mode_cable[3]:.2f} N -> {mode_cable[0]} (k={mode_cable[1]})", flush=True)
+        # Đổi độ cứng lò xo spring_link sang giá trị của chế độ đó (Parallel: 0.2) TRƯỚC khi khép má vào dây
+        self.set_spring_k(mode_cable[1])
 ```
