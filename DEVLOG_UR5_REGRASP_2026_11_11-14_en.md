@@ -111,12 +111,6 @@ Each finger is a closed four-bar linkage with two branches that meet at the pad:
 - the **driving branch**: base → driver → coupler (the motor acts on the driver);
 - the **passive branch**: base → spring_link (the sprung joint) → follower → pad (the pad touches the object); the follower is joined to the coupler by a `connect` constraint.
 
-The spring_link joint: range [−0.297, 0.8] rad, `stiffness` = 0.05 N·m/rad, `springref` = 2.62 rad (outside the range, so the spring always pushes spring_link towards the upper limit). The spring torque:
-
-$$ \tau_s = k \, (q_{ref} - q_s), \qquad q_{ref} = 2.62 \ \mathrm{rad} $$
-
-At q_s = 0.4 rad: k = 0.05 gives tau_s = 0.05 × (2.62 − 0.4) ≈ 0.11 N·m; k = 0.2 gives tau_s ≈ 0.44 N·m (driver torque limit 3.2 N·m). The follower has limits ±0.872664 rad.
-
 ### 3.2 Hypothesis and how it was tested
 Hypothesis: when one finger touches the cable at one point only, the off-centre force produces a moment on the passive linkage; the k = 0.05 spring is too weak to hold it, so spring_link falls to ≈ 0 and the follower rotates to its limit: the finger **collapses into a second configuration**, the pad moves back → jaw offset. Tested by overriding `dof_passive_stiffness` of the two spring_link joints and re-running case T4.
 
@@ -151,22 +145,8 @@ Cause (measured, k = 0.2 vs 0.05 when grasping the plug): the driver stops at 0.
 
 → **No single stiffness satisfies both**: the plug needs k ≤ 0.1, the cable needs k ≥ 0.15.
 
-### 3.5 k = 0 (Encompassing in the first version of the spec) is not usable either
-With k = 0 when grasping the plug: the left finger collapses (spring_link 0.053; follower 0.873), the plug is held tilted by 35°, `insertion IK failed`. So finger collapse happens **also with the plug** when there is no spring; k = 0.05 is enough to keep it stable for the plug (large central grip force, many contact points). The spec was later corrected by the user to k = 0.05.
-
-### 3.6 Relaxing the follower limit (13 Nov)
-If the finger were only "stuck at the 0.873 stop", relaxing the limit should remove the offset. Result:
-
-| Follower limit | follower / spring_link of the offending finger | Result |
-|---|---|---|
-| ±0.873 (original) | 0.873 / 0.156 | off-centre, still holds the cable |
-| ±1.2 | 1.19 / 0.068 | worse offset, **does not hold the cable** |
-| ±1.57 | 1.34 / 0.032 | worse offset, does not hold the cable |
-
-→ The 0.873 limit is not the cause; it only **stops the collapse from going further**. A collapsed finger does not stop when the stop is removed: spring_link → 0 and the follower keeps rotating. This is an instability of the linkage, not friction or a hard stop.
-
 ## 4. 14 Nov – V6: grasp modes per spec.md section 2.1.8
-
+[<img width="995" height="827" alt="GraspMode" src="https://github.com/user-attachments/assets/0a7a35a7-bbbc-449a-a013-00dab02c4a2e" />](<img width="995" height="827" alt="GraspMode" src="https://github.com/user-attachments/assets/0a7a35a7-bbbc-449a-a013-00dab02c4a2e" />)
 ### 4.1 Formula
 Each finger makes one friction contact, so for an object of mass m not to slip under acceleration a:
 
