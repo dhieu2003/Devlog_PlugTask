@@ -104,22 +104,6 @@ where $p_R$, $p_L$ are the positions of the two pads; $p_w$, $R_w$ are the posit
 | Closing amount / grip force | close 0.79 instead of 0.8; cable grip force 0.8 instead of 2.2 N·m | unchanged |
 | The cable position on the pad decides the symmetry | T3 (lift 7 mm) and T4 (old height) have the cable at the same position relative to the TCP but give different results | wrong (section 2.3) |
 
-### 2.3 Variable-separation experiments (11–12 Nov, `--regrasp-only`, cable placed at a given position)
-| | Condition | Right / left pad | Conclusion |
-|---|---|---|---|
-| T1 | old height, no cable | +25.3 / −25.3 | symmetric |
-| T2 | cable placed at z = −16 mm | — | **invalid**: the cable is under the floor and gets pushed away |
-| T3 | lift 7 mm, cable y = −1, z = −5 | +11.7 / −11.7 | symmetric, 3 contact points per side |
-| T4 | old height, cable y = −1, z = −5 | **+36.4 / −26.6** | off-centre, right finger 1 contact point |
-| T5 | old height, cable y = +12 | **+26.2 / −36.5** | off-centre at the **left** finger (1 contact point) |
-| T6 | old height, cable z = +2 | — | **invalid**: the cable is pushed out |
-| T7 | lift 3 mm | **+36.2 / −23.5** | off-centre, right finger 1 contact point |
-
-Measured rule: **the offending finger is always the finger that touches the cable at only 1 point**, and which side is off changes. Joint angles of the offending finger: coupler ≈ −0.70, spring_link ≈ 0.155, **follower = 0.873**; the other finger: −0.52, 0.38, 0.28.
-
-### 2.4 Temporary fix in V5full
-Lifting the cable grasp point by 7 mm → offset 0.03 mm, but this differs from V4 and the cause is unexplained (lifting 3 mm still gives a 6 mm offset; 5 mm and above is symmetric).
-
 ## 3. 12–13 Nov – cause: the `spring_link` spring is too weak
 
 ### 3.1 Finger structure (read from `2f85.xml` of MuJoCo Menagerie)
