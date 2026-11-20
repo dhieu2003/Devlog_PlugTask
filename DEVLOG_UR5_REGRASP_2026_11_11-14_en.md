@@ -54,8 +54,6 @@ In V1, `pose_line`, `line_segment`, `joint_line` and the IK-branch selection (`i
 | `ik_near`, `ik_candidates` (IK-branch selection, my code) | **No** (V1, V4) |
 | Newton/MuJoCo simulation | No (`enable_self_collisions=False`) |
 
-**What does "V4 is collision-free" mean?** I once said "V4 being collision-free may be luck". Re-measured on 1782 configurations taken from the V4 plans: minimum clearance 4.1 mm (forearm–wrist_2 pair). V4 really is collision-free, but **no mechanism guarantees it**; the V4 IK branches happen not to fall into the penetrating region, so changing the IK branch could cause penetration as in V1.
-
 ### 1.4 Fix
 Put cuRobo's own measurement (same spheres, same ignore table) **in the places cuRobo does not cover**, then reject every violating solution/segment.
 
@@ -68,13 +66,10 @@ $$ d_{\min}(q) = \min_{(a,b) \in P} d_{ab}(q) $$
 Notation:
 - `a, b`: two different links; `i`, `j` run over the spheres of a and b.
 - `c_i(q)`, `c_j(q)`: sphere centres; `r_i`, `r_j`: radii; `||.||`: Euclidean distance. The bracketed expression is the clearance between **two sphere surfaces**: positive = separated, negative = penetrating.
-- `P` = `SELF_PAIRS` = the 9 pairs of the "checked" table in section 1.2 (the 6 ignored pairs are not in P and were **copied from `self_collision_ignore` in `ur5_build_assets_V4.py`** so that both sides use the same rule). While carrying the plug, P gets 3 more pairs: (shoulder, plug), (upper_arm, plug), (forearm, plug).
 
 Acceptance rule (δ = `SELF_MARGIN` = 2 mm):
 
 $$ d_{\min}(q) \ge \delta \quad \text{(configuration)}, \qquad \min_k d_{\min}(q_k) \ge \delta \quad \text{(path } q_1 \dots q_N \text{)} $$
-
-Why δ = 2 mm: the smallest structural value of the UR5 is 4.1 mm (forearm–wrist_2), so δ = 2 mm rejects genuinely folded postures (−10 to −68 mm) without blocking normal ones; a δ larger than 4.1 mm would block even the Home posture.
 
 **Where the check is applied** (functions in `ur5_regrasp_geom_V6.py` and `ur5_regrasp_curobo_V6.py`):
 - **Measurement function** (`ur5_regrasp_geom_V6.py`): `self_clearance(q, carrying)` implements the two equations above using the sphere model and the 9-pair table (plus the 3 plug pairs when carrying), with `SELF_MARGIN = 0.002`; `path_self_clearance` takes the minimum over a whole path.
