@@ -1,9 +1,5 @@
 # DEVLOG 2026-11-11 → 2026-11-14 – ur5_regrasp: self-collision avoidance, gripper-jaw offset when grasping the cable, and V6
 
-This document merges the work of 11, 12, 13 and 14 November 2026. For every fault it records: **symptom → cause (measured / only a guess) → fix → result**. "Measured" means numbers read from the simulation logs; "guess" means not yet proven.
-
-(English version of `DEVLOG_UR5_REGRASP_2026_11_11-14.md`; all source-code excerpts have been removed, the file names in the text point to the code.)
-
 ## 0. Summary
 
 | Fault | Cause | Fix | Result |
