@@ -77,8 +77,6 @@ $$ d_{\min}(q) \ge \delta \quad \text{(configuration)}, \qquad \min_k d_{\min}(q
 - **Rejecting penetrating straight-IK paths / joint paths** (end of `pose_line`; `joint_line` does the same): this is where V1 had no check. If `path_self_clearance` of the path is below `SELF_MARGIN`, the function returns `None` and the planner tries another segment or branch.
 - **Final guard for every segment**: after the plan is built, the planner prints `self-collision clearance` for each segment and raises `RuntimeError` if it is < 0, so the plan can never silently pass a penetrating segment.
 
-**Negative-case verification** (the function must catch real collisions): the folded posture `[0, −0.1, −3.1, −1.5, 0, 0]` gives −68 mm, `[0, −2.9, −3.0, 0, 0, 0]` gives −40 mm.
-
 ### 1.5 Result
 Minimum clearance of each segment (from the `[check] ... self-collision clearance` lines in the logs):
 
@@ -88,10 +86,7 @@ Minimum clearance of each segment (from the `[check] ... self-collision clearanc
 | V2 → V2new | cable-pick step −19.4 mm (base-joint branch 294°) | **4.1 mm** (cuRobo returns a base-joint branch ≈ 11°) |
 | V4 → V5full / V6 | 4.1 mm (no mechanism guaranteeing it) | 4.1 mm in every segment, **with a mechanism** (the plan is stopped if < 0) |
 
-Consequences to note:
-- In V2 the only collision-free branch is the non-spinning branch; "no more collision" and "no more extra spin" are one and the same change. But with that branch the cable-laying segment `lay` makes the arm **touch a post (−10.5 mm)** for all 10 nearest IK solutions, so V2new only runs until the cable has been picked.
-- V1new runs to the end but **the cable slips out at gap23_in** (cable–TCP distance 5.3 → 7.4 → 7.1 → 9.6 mm, then lost). It is not known whether this is a pre-existing V1 fault or caused by the new IK branch (the original V1 would have to be run for comparison).
-- The 4.1 mm clearance is a structural value, not a safety margin; δ = 2 mm is a manually chosen threshold.
+[https://github.com/user-attachments/assets/7df06a6a-63ae-4d5d-aa8e-96e8f1433680](https://github.com/user-attachments/assets/7df06a6a-63ae-4d5d-aa8e-96e8f1433680)
 
 ## 2. 11–12 Nov – investigating the off-centre jaws when grasping the cable
 
