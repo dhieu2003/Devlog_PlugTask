@@ -62,22 +62,4 @@ Cable from seeds 2029-2032 (random), posts from the guide (y2 = 0.04 in cases 2 
 
 Post 3 is always (0.85, 0). z range of the sockets in this group is only 0.08 m: sockets with z <= 0.25 could not be planned when post 2 is at y = 0.04 (tested 0.22, 0.24, 0.25).
 
-## 3. Why the right-hand socket was hard, and the fix
-Diagnostic runs (left vs right socket, with and without the cable, up to the end of the carrying phase):
-- For a right socket the plug must go to post 1 at y = -0.2, far from the lift pose (y = +0.26). The inverse-kinematics routine picked the branch with the smallest joint-space norm, which is an "over the back" branch (shoulder 155 deg, lift joint -184 deg, wrist -251 deg).
-- The next leg then rotated the shoulder 210 deg and the wrist 205 deg in 8 s (left socket: 2 s). The plug slid 2-4 cm down in the pads (plug-to-TCP offset 1.2 -> 3.6-5 cm) and tilted 14 deg (no cable) / 35 deg (with cable), which ended in `insertion IK failed`.
-- Fix: `UR5P_NATURAL=1` rejects IK branches whose shoulder lift joint is outside (-180, 0) deg. The shoulder rotation of that leg drops to 19 deg, the wrist to 3 deg, and the plug tilt at the socket to 1.5 deg. In r11, socket3 inserted the plug (1.7 mm deviation after release).
-- The share of the cable force in the tilt (14 -> 35 deg) comes from comparing runs with and without the cable on the same path, not from a separate measurement.
-
-## 4. Why the trials failed
-1. **Cable slipped out of the gripper (shape1, shape4, posts3, socket2, all4: 5 trials).** The parallel-grip pads hold the cable by friction; when the cable is blocked by a post or dragged while lowering, it slides. The simulation stops when the cable point nearest the gripper is more than 10 cm from the TCP. Without that stop the cable snags on the posts, stretches (1.57 -> 1.9-2.2 m) and the coupled Newton/VBD system diverges. A grip effort of 3.2 N m (56 N) was used; whether it is sufficient has not been proven.
-2. **cuRobo cannot plan the re-grasp (posts4, socket3: 2 trials).** posts4: every cable candidate fails (straight cable offers few grasp points near the posts, and the return-to-Home plan fails); socket3: the approach to every one of the 3 candidates fails. The cause of the socket3 failure was not investigated (the low, right-hand socket is a hypothesis only).
-
-## 5. Open issues
-- Cable slip remains the main failure mode (5 of 7 failures).
-- Re-grasp after insertion for the right-hand, low socket.
-- Sockets with z <= 0.25 together with a displaced post 2.
-- Each trial was run once; cuRobo and VBD are stochastic, so the spread is unknown.
-- The 16 "worlds" are 16 independent processes, not one multi-world Newton model.
-
-Files: `data/scripts/ur5_16parallel_scenarios_r11.py` (new), `ur5_16parallel_geom.py` (`weave_z`), `ur5_16parallel_curobo.py` (`UR5P_NATURAL`). Devlog: `data/devlog/DEVLOG_UR5_16PARALLEL_R11_2026_11_17.md`.
+[https://github.com/user-attachments/assets/c33ae1b6-9e3e-4f0d-82eb-fb59f6a4d2ef](https://github.com/user-attachments/assets/c33ae1b6-9e3e-4f0d-82eb-fb59f6a4d2ef)
