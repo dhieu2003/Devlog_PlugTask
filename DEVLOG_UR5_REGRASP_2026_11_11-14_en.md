@@ -102,8 +102,6 @@ where $p_R$, $p_L$ are the positions of the two pads; $p_w$, $R_w$ are the posit
 |---|---|---|
 | The two PD controllers of the two jaws lose synchronisation | one PD for both jaws (right finger ×2, left finger ke = kd = 0) | offset unchanged |
 | Closing amount / grip force | close 0.79 instead of 0.8; cable grip force 0.8 instead of 2.2 N·m | unchanged |
-| Fingertip touches the floor | contact measurement | the symmetric case touches the floor even more |
-| The cable deforms after insertion so the cable TCP is higher (user's hypothesis) | read the code: the grasp point is computed from the **current** cable position; the cable is only 4 mm above rest | wrong |
 | The cable position on the pad decides the symmetry | T3 (lift 7 mm) and T4 (old height) have the cable at the same position relative to the TCP but give different results | wrong (section 2.3) |
 
 ### 2.3 Variable-separation experiments (11–12 Nov, `--regrasp-only`, cable placed at a given position)
