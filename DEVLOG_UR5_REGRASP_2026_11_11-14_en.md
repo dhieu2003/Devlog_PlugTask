@@ -11,14 +11,6 @@ This document merges the work of 11, 12, 13 and 14 November 2026. For every faul
 | **A. Arm self-collision** (V1, V2; V4 was only "collision-free" because the IK branches happened to be suitable) | cuRobo **does** check self-collision (spheres of `ur5.yml`, binary constraint), but only for the segments it optimises itself; straight IK segments (`pose_line`, `line_segment`), the choice of IK branch and the simulation (`enable_self_collisions=False`) check nothing (sections 1.2–1.3, evidence in 1.1) | A `self_clearance` function (collision spheres of `ur5.yml`) filters IK solutions and straight paths, threshold 2 mm | Every segment of V5full/V1new/V2new/V6: clearance ≥ 4.1 mm (a structural value) |
 | **B. Jaws off-centre when grasping the cable** (V1, V4) | The four-bar linkage **of one finger collapses** when the `spring_link` spring is too weak (k ≤ 0.125 N·m/rad) and the pad touches the cable at one point only | Grasp modes per spec 2.1.8: the cable is grasped in **Parallel (k = 0.2)**, the plug in **Encompassing (k = 0.05)** | V6: jaw offset **0.01–0.02 mm** (V4: ≈ 5 mm), the cable grasp point stays as in V4 (no 7 mm lift as in V5full) |
 
-Full V6 result (one run, 972 s wall clock / 72.2 s simulated): plug inserted with 0.111 mm axis offset (limit 0.2 mm), 0.414° tilt; the cable is not dropped; after laying the cable the plug moves 0.620 mm from its inserted position.
-
-**What to know before using these results**
-- Every statement about V6 comes from **one full run** (and one re-run after cleaning the source code, which gave the same numbers). No repeated runs were made to measure stability.
-- The "collapsed finger" mechanism is supported by joint-angle measurements and a limit-relaxation experiment (section 3.6); there is **no mechanical analysis** of the stability condition of the four-bar linkage.
-- The per-finger grip force F used to choose the mode is an **estimate** from the torque limit (section 4.2), not a direct measurement.
-- The values m = 2.5, S = 2.5, k = 0.2 and k = 0.05 in spec 2.1.8 were set by the user; I only checked that they work.
-
 ## 1. 11 Nov – arm self-collision avoidance (V5full, V1new, V2new, V6)
 
 Terminology: a **joint** is a rotation axis; a **link** is the rigid body between two joints. The UR5 has 6 joints and 6 collision links (shoulder, upper_arm, forearm, wrist_1, wrist_2, wrist_3). Both cuRobo and my code check collisions between **links**, not between joints.
@@ -35,48 +27,7 @@ Terminology: a **joint** is a rotation axis; a **link** is the rigid body betwee
 | wave3 | 140 | 7 | **−10.3 mm** | forearm – wrist_3 | [−14, −59, 60, 73, **−222**, −111] |
 | other segments | — | 0 | 4.1 mm | — | — |
 
-Three things can be read from the table:
-- All 192 penetrating points belong to **one single pair: forearm and wrist_3 (wrist end + gripper)**.
-- Both worst configurations have joint wrist_2 at about **−226° and −222°**, i.e. beyond half a turn (±180°). I have not proven a causal link between this angle and the collision; it is only a common feature of the two worst configurations.
-- The worst configuration of wave1 is its **last** point and also the **first** point of wave2 (all 80 points of wave2 penetrate); the worst configuration of wave3 is its first point. So the arm enters a penetrating posture and stays in it for the whole segment.
-
 The original V2 shows a similar problem at the cable-pick step: base-joint branch 294° and the straight descent to the cable have a clearance of **−19.4 mm** (measured the same way).
-
-### 1.2 Which links cuRobo checks, which it ignores, and why
-**cuRobo does check self-collision.** The cuRobo configuration in this environment: `MotionPlannerCfg.create(..., self_collision_check=True)` (default), a `self_collision_cfg` constraint with `weight: 5000.0` and `convert_to_binary: True` in `metrics_base.yml`, and the `self_collision_cfg` block is present in both the IK solver (`ik/lbfgs_ik.yml`) and the trajectory optimiser (`trajopt/lbfgs_bspline_trajopt.yml`).
-
-**The collision model** is a set of spheres attached to each link (`data/assets/ur5/ur5.yml`, entry `collision_spheres`): shoulder 2 spheres, upper_arm 5, forearm 5, wrist_1 2, wrist_2 2, wrist_3 10 (the wrist_3 spheres also represent the Robotiq gripper). With 6 links there are C(6,2) = 15 link pairs. cuRobo splits the 15 pairs into two groups through the `self_collision_ignore` table:
-
-**Ignored group – 6 pairs** (never checked):
-
-| Link pair | Clearance between the spheres: at Home | over 300 random configurations within the joint limits (min … max) |
-|---|---|---|
-| shoulder – upper_arm | −107.2 mm | −107.2 … −107.1 |
-| upper_arm – forearm | −43.3 mm | −43.3 … −43.3 |
-| forearm – wrist_1 | −55.7 mm | −55.8 … −55.7 |
-| wrist_1 – wrist_2 | −48.0 mm | −48.0 … −48.0 |
-| wrist_2 – wrist_3 | −60.7 mm | −60.7 … −60.7 |
-| wrist_1 – wrist_3 | +17.9 mm | −4.9 … +31.1 |
-
-**Checked group – 9 pairs:**
-
-| Link pair | At Home | Minimum over 300 random configurations |
-|---|---|---|
-| shoulder – forearm | 315.3 mm | −23.6 |
-| shoulder – wrist_1 | 470.6 | −52.3 |
-| shoulder – wrist_2 | 476.7 | −59.8 |
-| shoulder – wrist_3 | 442.4 | −63.0 |
-| upper_arm – wrist_1 | 287.3 | −50.7 |
-| upper_arm – wrist_2 | 288.5 | −72.3 |
-| upper_arm – wrist_3 | 378.3 | −85.0 |
-| forearm – wrist_2 | **4.1** (also the largest value in 300 samples) | −5.0 |
-| forearm – wrist_3 | 73.6 | −86.6 |
-
-**Why are the first 6 pairs ignored?** Evidence is in the first table: two adjacent links are joined by a joint, and their approximating spheres **overlap at that very joint in every configuration** (penetration 43–107 mm, almost constant with the configuration; I infer that the spheres of two adjacent links lie near the common joint axis and rotate about it, which I have not checked separately). If these pairs were checked, **every** configuration, Home included, would be reported as "in collision" and cuRobo could not find any trajectory. By cuRobo's design this is an error of the sphere approximation, not a real collision, because adjacent links are directly connected by a joint (I did not verify this with meshes). wrist_1–wrist_3 are not directly adjacent but their spheres are close around the wrist (sometimes overlapping, minimum −4.9 mm), so they are ignored together with the wrist links.
-
-**The remaining 9 pairs** are links far apart on the chain; their spheres do not overlap in the normal state (Home: 4.1 mm to 477 mm) but **can penetrate when the arm is folded** (last column: −5 to −87 mm). The pair **forearm–wrist_2 is 4.1 mm apart at Home and never more than 4.1 mm in any of the 300 random configurations (nor in the 1782 configurations of V4)**, so it is the closest pair and 4.1 mm is a structural value of the UR5.
-
-Important remark: the penetrating pair in V1 is **forearm–wrist_3**, one of the 9 pairs that **are** checked. Therefore the V1 fault cannot be explained by cuRobo "ignoring adjacent joints".
 
 ### 1.3 Cause
 Since the forearm–wrist_3 pair is in the group checked by cuRobo, the problem is not that cuRobo checks wrongly but that **the penetrating segments never pass through cuRobo's checker**.
