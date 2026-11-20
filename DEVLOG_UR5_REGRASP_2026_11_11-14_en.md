@@ -86,7 +86,7 @@ Minimum clearance of each segment (from the `[check] ... self-collision clearanc
 | V2 → V2new | cable-pick step −19.4 mm (base-joint branch 294°) | **4.1 mm** (cuRobo returns a base-joint branch ≈ 11°) |
 | V4 → V5full / V6 | 4.1 mm (no mechanism guaranteeing it) | 4.1 mm in every segment, **with a mechanism** (the plan is stopped if < 0) |
 
-[https://github.com/user-attachments/assets/7df06a6a-63ae-4d5d-aa8e-96e8f1433680](https://github.com/user-attachments/assets/7df06a6a-63ae-4d5d-aa8e-96e8f1433680)
+[https://github.com/user-attachments/assets/a19b05f7-3149-4a24-89e8-7041f95d5cbe](https://github.com/user-attachments/assets/a19b05f7-3149-4a24-89e8-7041f95d5cbe)
 
 ## 2. 11–12 Nov – investigating the off-centre jaws when grasping the cable
 
@@ -192,42 +192,4 @@ Contact force measured when grasping the cable at k = 0.2: 39–43 N per side, c
 | Cable dropped | no | no |
 | Self-collision clearance | 4.1 mm | 4.1 mm |
 
-## 5. My mistakes (so you know when re-reading)
-- Saying that V4 avoids self-collision "maybe by luck" before measuring → wrong (section 1.3).
-- Repeatedly suspecting "fingertip touches the floor" and "the two PDs are not synchronised" as the cause of the offset → both wrong (section 2.2).
-- The hypothesis "the cable position on the pad decides" → refuted by T3/T4 (section 2.3). Experiments T2 and T6 were invalid because the cable was placed under the floor / outside the gripper.
-- On 12 Nov a background wait process used `pgrep -f` that matched itself and **never terminated**, wasting more than an hour of waiting before the user reminded me.
-- I first said my configuration differs from Menagerie in the `solref` of the driver constraint; on re-reading the file the value 0.005 is **Menagerie's own**. The real difference is only two separate driver actuators (kp = 20, kd = 1) instead of one tendon actuator `split`, and the "single PD" experiment did not change the result.
-- Running V6 with a fixed k = 0.2 for the whole task broke the plug (section 3.4); choosing k per stage is what works.
-- At first I read the F_sw formula with m per object (plug 0.1 kg, cable ≈ 0.11 kg), giving F_sw ≈ 1–1.5 N and the cable ending up in Encompassing; the formula was corrected by the user to m = 2.5, S = 2.5.
-
-## 6. Limitations and next steps
-1. V6 has not been run repeatedly to measure stability; earlier runs were non-deterministic (plug displacement 1–4 mm, sometimes NaN).
-2. There is no mechanical analysis of the stability condition of the four-bar linkage; only joint-angle measurements and a stiffness sweep. The window k ≈ 0.15–0.2 for cable grasping is very narrow (k = 0.3 already fails).
-3. F is estimated from the torque limit; F should be measured directly at grasp time and used for the mode decision. For the cable the margin to the threshold is only 8.6 N (38.8 vs 47.37 N).
-4. The friction mu in F_sw uses `PAD_MU = 0.7` for both the plug and the cable, while the cable proxy in the simulation has mu = 1.2.
-5. Finger collapse can still occur if k or the grip force is changed; adding damping to spring_link is another way to prevent the collapse with little effect on plug grasping (not tried).
-6. V1new: the cable slips at gap23_in (not known whether it already exists in V1). V2new: the cable-laying segment touches a post (−10.5 mm), only runs until the cable is picked.
-7. The origin of the colliding V1 segments (wave1–wave3 not optimised by cuRobo) is inferred from the point counts of the segments and the V1 code structure; V1 was not re-run to confirm each segment.
-8. The simulation still has `enable_self_collisions` off; self-collision safety relies on the sphere model, which has not been compared with meshes at extreme postures.
-
-## 7. Files and how to re-run
-| File (`data/scripts/`) | Content |
-|---|---|
-| `ur5_regrasp_V6.py` | main simulation (cleaned, commented line by line) |
-| `ur5_regrasp_geom_V6.py` | geometry, `self_clearance`, `path_self_clearance` |
-| `ur5_regrasp_curobo_V6.py` | cuRobo planner (self-collision filtering of IK solutions) |
-| `ur5_regrasp_render_isaac_V6.py` | Isaac video rendering |
-
-Video: `data/results/video_ur5_regrasp_V6.mp4`. Log: `data/results/run_V6.log`.
-
-To re-run: from `data/scripts`, run `ur5_regrasp_V6.py` with the `--test` option for the full V6 sequence (about 16 minutes), then `ur5_regrasp_render_isaac_V6.py` with `--stride 3` for the video.
-
-## 8. Where the code is (code excerpts removed)
-The jaw-offset fix lives in `ur5_regrasp_V6.py`:
-- `grasp_mode` and its constants: choose the mode from F and F_sw (sections 4.1–4.2).
-- `Example.__init__`: sets the initial spring stiffness for the plug mode on the two spring_link degrees of freedom and prints the chosen mode.
-- `set_spring_k`: rewrites the passive-stiffness table of the two spring_link degrees of freedom and notifies the MuJoCo solver of the joint-property change, at run time.
-- `regrasp_phase`: picks the grasp mode for the cable and calls `set_spring_k` just before the jaws close on the cable.
-
-The self-collision code is in `ur5_regrasp_geom_V6.py` (`SELF_IGNORE_PAIRS`, `SELF_PAIRS`, `SELF_MARGIN`, `self_clearance`, `path_self_clearance`) and `ur5_regrasp_curobo_V6.py` (`ik_near`, `ik_candidates`, `pose_line`, `joint_line`, final check); see section 1.4.
+[https://github.com/user-attachments/assets/7df06a6a-63ae-4d5d-aa8e-96e8f1433680](https://github.com/user-attachments/assets/7df06a6a-63ae-4d5d-aa8e-96e8f1433680)
